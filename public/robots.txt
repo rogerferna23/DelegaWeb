@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Admin pages should not be indexed by Google
+Disallow: /admin/
+Disallow: /admin
+
+Sitemap: https://delegaweb.com/sitemap.xml

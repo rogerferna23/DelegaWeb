@@ -1,0 +1,224 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { logAction } from '../lib/auditLog';
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [allRequests, setAllRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfile = async (user) => {
+    if (!user) return null;
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    return data;
+  };
+
+  const fetchAllProfiles = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: true });
+    setUsers(data || []);
+  };
+
+  const fetchPendingRequests = async () => {
+    const { data } = await supabase
+      .from('admin_requests')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    setPendingRequests(data || []);
+  };
+
+  const fetchAllRequests = async () => {
+    const { data } = await supabase
+      .from('admin_requests')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20);
+    setAllRequests(data || []);
+    setPendingRequests((data || []).filter(r => r.status === 'pending'));
+  };
+
+  const applySession = async (authUser) => {
+    if (!authUser) {
+      setCurrentUser(null);
+      setUsers([]);
+      setPendingRequests([]);
+      return;
+    }
+    const p = await fetchProfile(authUser);
+    if (p) {
+      const user = { ...authUser, role: p.role, name: p.name };
+      setCurrentUser(user);
+      fetchAllProfiles();
+      fetchAllRequests();
+    } else {
+      setCurrentUser(null);
+    }
+  };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        applySession(session.user).finally(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        setCurrentUser(null);
+        setUsers([]);
+        setPendingRequests([]);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      // Log failed attempt (no user context yet)
+      try {
+        await supabase.from('audit_log').insert({
+          user_email: email,
+          action: 'login_failed',
+          details: 'Credenciales incorrectas',
+        });
+      } catch (_) {}
+      return { success: false, error: 'Credenciales incorrectas' };
+    }
+
+    setTimeout(async () => {
+      await applySession(data.user);
+      logAction({ id: data.user.id, email: data.user.email }, 'login_success', 'Inicio de sesión exitoso');
+    }, 0);
+
+    return { success: true };
+  };
+
+  const logout = async () => {
+    if (currentUser) {
+      await logAction(currentUser, 'logout', 'Cierre de sesión');
+    }
+    await supabase.auth.signOut();
+  };
+
+  const addAdmin = async ({ name, email, password, role = 'admin' }) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) return { success: false, error: error.message };
+    if (!data.user) return { success: false, error: 'No se pudo crear el usuario' };
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert({ id: data.user.id, name, role, email });
+
+    if (profileError) return { success: false, error: profileError.message };
+
+    await logAction(currentUser, 'admin_created', `Creó admin: ${email} (${role})`);
+    await fetchAllProfiles();
+    return { success: true };
+  };
+
+  const removeAdmin = async (userId) => {
+    if (userId === currentUser?.id) return { success: false, error: 'No puedes eliminarte a ti mismo' };
+
+    const target = users.find(u => u.id === userId);
+    const { error } = await supabase.from('profiles').delete().eq('id', userId);
+    if (error) return { success: false, error: error.message };
+
+    await logAction(currentUser, 'admin_deleted', `Eliminó admin: ${target?.email}`);
+    await fetchAllProfiles();
+    return { success: true };
+  };
+
+  // --- Flujo de aprobación ---
+
+  const requestAdminAction = async ({ action, targetEmail, targetName, targetRole, targetPassword }) => {
+    const { error } = await supabase.from('admin_requests').insert({
+      requested_by: currentUser.id,
+      action,
+      target_email: targetEmail || '',
+      target_name: targetName || '',
+      target_role: targetRole || '',
+      target_password: targetPassword || '',
+    });
+    if (error) return { success: false, error: error.message };
+    await logAction(currentUser, 'request_submitted', `Solicitud: ${action}`);
+    await fetchAllRequests();
+    return { success: true };
+  };
+
+  const reviewRequest = async (requestId, approved) => {
+    const req = pendingRequests.find(r => r.id === requestId);
+    if (!req) return { success: false, error: 'Solicitud no encontrada' };
+
+    if (approved) {
+      if (req.action === 'create_admin') {
+        const result = await addAdmin({
+          name: req.target_name,
+          email: req.target_email,
+          password: req.target_password || 'TempPass123!',
+          role: req.target_role,
+        });
+        if (!result.success) return result;
+      } else if (req.action === 'delete_admin') {
+        const target = users.find(u => u.email === req.target_email);
+        if (target) await removeAdmin(target.id);
+      } else if (req.action === 'add_expense') {
+        // Write gasto directly to localStorage
+        try {
+          const existing = JSON.parse(localStorage.getItem('dw_gastos_v2') || '[]');
+          const newGasto = {
+            id: Date.now().toString(),
+            description: req.target_name,
+            amount: parseFloat(req.target_email) || 0,
+            date: req.target_role,
+          };
+          const updated = [...existing, newGasto].sort((a, b) => new Date(a.date) - new Date(b.date));
+          localStorage.setItem('dw_gastos_v2', JSON.stringify(updated));
+        } catch (_) {}
+      }
+      // download_report: just mark approved — superadmin downloads from notification UI
+    }
+
+    const { error } = await supabase
+      .from('admin_requests')
+      .update({ status: approved ? 'approved' : 'rejected', reviewed_by: currentUser.id })
+      .eq('id', requestId);
+
+    if (error) return { success: false, error: error.message };
+
+    await logAction(currentUser, approved ? 'request_approved' : 'request_rejected',
+      `${approved ? 'Aprobó' : 'Rechazó'} solicitud: ${req.action}`);
+    await fetchAllRequests();
+    return { success: true, req };
+  };
+
+  return (
+    <AuthContext.Provider value={{
+      currentUser, users, pendingRequests, allRequests, loading,
+      login, logout, addAdmin, removeAdmin,
+      requestAdminAction, reviewRequest, fetchPendingRequests, fetchAllRequests,
+    }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');
+  return ctx;
+}
