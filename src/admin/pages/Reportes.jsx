@@ -359,7 +359,13 @@ export default function Reportes() {
             <LineChart data={chartData} margin={{ left: -20, right: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
               <XAxis dataKey="mes" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+              <YAxis 
+                tick={{ fill: '#6b7280', fontSize: 10 }} 
+                axisLine={false} 
+                tickLine={false} 
+                tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v}`}
+                domain={[0, 'auto']}
+              />
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ fontSize: 11, color: '#9ca3af' }} />
               <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#f97316" strokeWidth={2} dot={false} />
@@ -373,7 +379,13 @@ export default function Reportes() {
             <BarChart data={categoryData} margin={{ left: -20, right: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
               <XAxis dataKey="categoria" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
+              <YAxis 
+                tick={{ fill: '#6b7280', fontSize: 10 }} 
+                axisLine={false} 
+                tickLine={false} 
+                tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v}`}
+                domain={[0, 'auto']}
+              />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="ingresos" name="Ingresos" fill="#f97316" radius={[4, 4, 0, 0]} />
             </BarChart>

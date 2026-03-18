@@ -40,10 +40,11 @@ const servicesList = [
   {
     title: "Mantenimiento web",
     description: "Hosting, dominio, actualizaciones y soporte técnico incluidos. El precio mensual se adapta según las necesidades de tu empresa.",
-    price: "$25 – $500 USD",
+    price: "Consulta",
     priceNote: "+ impuestos · mensual",
     icon: <Wrench />,
     highlight: false,
+    disableHiring: true,
   },
   {
     title: "Coaching de ventas",
@@ -128,7 +129,14 @@ const Services = () => {
               </span>
             </div>
             {/* CTA button */}
-            {isVariablePrice(service) ? (
+            {service.disableHiring ? (
+              <a
+                href="#contacto"
+                className="mt-1 w-full text-center text-xs font-semibold text-gray-400 hover:text-white border border-white/10 hover:border-white/20 py-2 rounded-xl transition-all block"
+              >
+                Consultar precio
+              </a>
+            ) : isVariablePrice(service) ? (
               <a
                 href="#contacto"
                 className="mt-1 w-full text-center text-xs font-semibold text-gray-400 hover:text-white border border-white/10 hover:border-white/20 py-2 rounded-xl transition-all block"
@@ -230,8 +238,8 @@ const Services = () => {
       <div className="mt-16">
         <div className="text-center mb-10">
           <p className="text-[10px] text-primary font-semibold tracking-widest uppercase mb-2">Suscripción mensual</p>
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">Planes de <span className="text-primary">crecimiento</span></h2>
-          <p className="text-gray-400 text-sm">SEO, email marketing, campañas y coaching en un solo plan. Sin permanencia.</p>
+          <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">Impulso Digital <span className="text-primary">360</span></h2>
+          <p className="text-gray-400 text-sm">$770 – $2,197 · IVA incluido · Sin permanencia.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -243,13 +251,14 @@ const Services = () => {
             </div>
             <div className="flex flex-col gap-1.5">
               {[
-                '1 sesión de coaching estratégico',
-                '4 artículos SEO (600–800 palabras)',
-                '2 secuencias de email marketing',
-                '1 flujo de automatización',
-                '1 campaña publicitaria (Meta / Google)',
-                'Ajustes quincenales de campañas',
-                'Reporte mensual de rendimiento',
+                '1 sesión de Coaching Expansivo',
+                '1 sesión de consultoría en ventas estratégicas',
+                '4 artículos optimizados para SEO (600–800 palabras)',
+                '2 secuencias de email marketing (5 correos cada una)',
+                '1 flujo de automatización (bienvenida o agendamiento)',
+                '1 campaña publicitaria mensual (Meta Ads o Google Ads)',
+                'Ajustes quincenales de campañas y estrategia',
+                'Reporte mensual de resultados',
               ].map(item => (
                 <div key={item} className="flex items-start gap-2 text-[11px] text-gray-400">
                   <span className="text-primary mt-0.5 shrink-0">✓</span>
@@ -260,20 +269,20 @@ const Services = () => {
             <div className="h-px bg-white/5 mt-auto" />
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-2xl font-extrabold text-white tracking-tight">$576 USD</p>
-                <p className="text-[10px] text-gray-500">+ IVA · mensual</p>
+                <p className="text-2xl font-extrabold text-white tracking-tight">$770 USD</p>
+                <p className="text-[10px] text-gray-500">IVA incluido · mensual</p>
               </div>
               <span className="text-[10px] text-gray-500 text-right">50–100 leads/mes</span>
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setSelectedService({ title: 'Plan Starter', price: '$576 USD' })}
+                onClick={() => setSelectedService({ title: 'Plan Starter', price: '$770 USD' })}
                 className="flex-1 text-center text-xs font-semibold py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 transition-all"
               >
                 Contratar
               </button>
               <button
-                onClick={() => handleAddToCart({ title: 'Plan Starter', price: '$576 USD' })}
+                onClick={() => handleAddToCart({ title: 'Plan Starter', price: '$770 USD' })}
                 title="Agregar al carrito"
                 className="w-10 flex shrink-0 items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 transition-all"
               >
@@ -291,13 +300,15 @@ const Services = () => {
             </div>
             <div className="flex flex-col gap-1.5">
               {[
-                '2 sesiones de coaching estratégico',
-                '8 artículos SEO (800–1,000 palabras)',
+                '2 sesiones de Coaching Expansivo',
+                '2 sesiones de consultoría en ventas estratégicas',
+                '8 artículos optimizados para SEO (800–1,000 palabras)',
                 '4 secuencias de email marketing',
-                '2 campañas simultáneas (leads + remarketing)',
-                'Revisión y ajustes semanales',
+                'Flujos de automatización para captación y seguimiento de leads',
+                '2 campañas publicitarias activas (captación y remarketing)',
+                'Revisión y ajustes semanales de campañas',
                 'Call mensual de estrategia',
-                'Reporte quincenal con resultados',
+                'Reporte quincenal de resultados',
               ].map(item => (
                 <div key={item} className="flex items-start gap-2 text-[11px] text-gray-300">
                   <span className="text-primary mt-0.5 shrink-0">✓</span>
@@ -308,20 +319,20 @@ const Services = () => {
             <div className="h-px bg-primary/15 mt-auto" />
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-2xl font-extrabold text-primary tracking-tight">$1,155 USD</p>
-                <p className="text-[10px] text-gray-500">+ IVA · mensual</p>
+                <p className="text-2xl font-extrabold text-primary tracking-tight">$1,497 USD</p>
+                <p className="text-[10px] text-gray-500">IVA incluido · mensual</p>
               </div>
               <span className="text-[10px] text-gray-500 text-right">130–250 leads/mes</span>
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setSelectedService({ title: 'Plan Pro', price: '$1,155 USD' })}
+                onClick={() => setSelectedService({ title: 'Plan Pro', price: '$1,497 USD' })}
                 className="flex-1 text-center text-xs font-semibold py-2.5 rounded-xl bg-primary hover:bg-primaryhover text-white shadow-md shadow-primary/20 transition-all"
               >
                 Contratar
               </button>
               <button
-                onClick={() => handleAddToCart({ title: 'Plan Pro', price: '$1,155 USD' })}
+                onClick={() => handleAddToCart({ title: 'Plan Pro', price: '$1,497 USD' })}
                 title="Agregar al carrito"
                 className="w-10 flex shrink-0 items-center justify-center rounded-xl bg-primary hover:bg-primaryhover text-white shadow-md shadow-primary/20 transition-all"
               >
@@ -338,13 +349,15 @@ const Services = () => {
             </div>
             <div className="flex flex-col gap-1.5">
               {[
-                '2 sesiones de coaching estratégico',
+                '4 sesiones de Coaching Expansivo',
+                '4 sesiones de consultoría en ventas estratégicas',
                 '12 artículos SEO premium (1,000+ palabras)',
-                '12 secuencias de email marketing automatizadas',
-                'CRM profesional con dashboards personalizados',
-                '3 campañas activas (captación, remarketing, conversión)',
+                'Secuencias completas de email marketing automatizadas',
+                'Implementación de CRM para gestión de clientes potenciales',
+                '3 campañas publicitarias activas (captación, remarketing y conversión)',
                 'Reunión estratégica semanal',
-                'Reporte mensual de impacto y mejora continua',
+                'Optimización continua de campañas y estrategia',
+                'Reporte mensual de impacto y evolución',
               ].map(item => (
                 <div key={item} className="flex items-start gap-2 text-[11px] text-gray-400">
                   <span className="text-primary mt-0.5 shrink-0">✓</span>
@@ -355,20 +368,20 @@ const Services = () => {
             <div className="h-px bg-white/5 mt-auto" />
             <div className="flex items-end justify-between">
               <div>
-                <p className="text-2xl font-extrabold text-white tracking-tight">$1,733 USD</p>
-                <p className="text-[10px] text-gray-500">+ IVA · mensual</p>
+                <p className="text-2xl font-extrabold text-white tracking-tight">$2,197 USD</p>
+                <p className="text-[10px] text-gray-500">IVA incluido · mensual</p>
               </div>
-              <span className="text-[10px] text-gray-500 text-right">300–600 leads/mes</span>
+              <span className="text-[10px] text-gray-500 text-right">300–450 leads/mes</span>
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setSelectedService({ title: 'Plan Elite', price: '$1,733 USD' })}
+                onClick={() => setSelectedService({ title: 'Plan Elite', price: '$2,197 USD' })}
                 className="flex-1 text-center text-xs font-semibold py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 transition-all"
               >
                 Contratar
               </button>
               <button
-                onClick={() => handleAddToCart({ title: 'Plan Elite', price: '$1,733 USD' })}
+                onClick={() => handleAddToCart({ title: 'Plan Elite', price: '$2,197 USD' })}
                 title="Agregar al carrito"
                 className="w-10 flex shrink-0 items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white border border-white/10 hover:border-white/20 transition-all"
               >

@@ -184,7 +184,13 @@ export default function Dashboard() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" />
               <XAxis dataKey="mes" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+              <YAxis 
+                tick={{ fill: '#6b7280', fontSize: 10 }} 
+                axisLine={false} 
+                tickLine={false} 
+                tickFormatter={v => v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`}
+                domain={[0, 'auto']}
+              />
               <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#f97316', strokeWidth: 1, strokeDasharray: '4 4' }} />
               <Area type="monotone" dataKey="ventas" stroke="#f97316" strokeWidth={2} fill="url(#ventas)" />
             </AreaChart>
