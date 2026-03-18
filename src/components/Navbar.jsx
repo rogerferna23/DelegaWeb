@@ -15,14 +15,14 @@ const Navbar = () => {
     <>
       <nav className="sticky top-0 z-40 w-full bg-background/90 backdrop-blur-md">
         {/* Barra principal */}
-        <div className="flex items-center justify-between py-3 px-3">
+        <div className="relative flex items-center justify-between py-3 px-3">
           {/* Logo */}
           <a href="/" className="text-xl font-bold tracking-tight">
             Delega<span className="text-primary">Web</span>
           </a>
 
-          {/* Links escritorio */}
-          <div className="hidden md:flex items-center gap-8 text-gray-400 text-xs font-medium">
+          {/* Links escritorio — centrados absolutamente */}
+          <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8 text-gray-400 text-xs font-medium">
             <a href="#servicios" className="hover:text-white transition-all duration-300">Servicios</a>
             <a href="#proceso" className="hover:text-white transition-all duration-300">Proceso</a>
             <a href="#testimonios" className="hover:text-white transition-all duration-300">Testimonios</a>
