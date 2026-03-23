@@ -18,8 +18,8 @@ const Hero = () => {
       </p>
       
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
-        <a href="#presupuesto" className="w-full sm:w-auto bg-primary hover:bg-primaryhover text-white px-6 py-3 rounded-lg font-semibold transition-colors text-base">
-          Solicitar presupuesto
+        <a href="#contacto" className="w-full sm:w-auto bg-primary hover:bg-primaryhover text-white px-6 py-3 rounded-lg font-semibold transition-colors text-base">
+          Agenda tu cita
         </a>
         <a href="#servicios" className="w-full sm:w-auto bg-transparent hover:bg-white/5 border border-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors text-base">
           Ver servicios
