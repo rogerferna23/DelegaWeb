@@ -7,6 +7,9 @@ const PrivateBooking = () => {
   const containerRef = useRef(null);
 
   useEffect(() => {
+    // Asegurar que la página empiece desde arriba al navegar
+    window.scrollTo(0, 0);
+
     const initCalendly = () => {
       if (!window.Calendly || !containerRef.current) return;
       
