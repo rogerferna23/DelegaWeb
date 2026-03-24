@@ -26,11 +26,17 @@ const Footer = () => {
           </div>
           <div className="flex items-center gap-2 text-gray-400">
             <Phone className="w-4 h-4 text-primary" />
-            <span>+34 600 000 000</span>
+            <span>+34 711 20 89 67</span>
           </div>
           <div className="flex items-center gap-2 text-gray-400">
             <MapPin className="w-4 h-4 text-primary" />
             <span>España</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-4" /> {/* Espacio para alinear con los iconos de arriba */}
+            <Link to="/sesion-estrategica" className="text-gray-400 hover:text-white transition-colors">
+              Cita
+            </Link>
           </div>
         </div>
 

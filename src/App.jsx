@@ -18,6 +18,7 @@ import CloserProgram from './components/CloserProgram'
 import TermsAndConditions from './components/TermsAndConditions'
 import Copyright from './components/Copyright'
 import RefundPolicy from './components/RefundPolicy'
+import PrivateBooking from './components/PrivateBooking'
 import './App.css'
 
 // Admin panel
@@ -134,6 +135,15 @@ function App() {
         element={
           <>
             <CloserProgram />
+            <CookieConsent />
+          </>
+        }
+      />
+      <Route
+        path="/sesion-estrategica"
+        element={
+          <>
+            <PrivateBooking />
             <CookieConsent />
           </>
         }

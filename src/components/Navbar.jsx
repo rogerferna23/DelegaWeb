@@ -50,8 +50,11 @@ const Navbar = () => {
                 <LogIn className="w-3.5 h-3.5" />
                 Iniciar Sesión
               </Link>
-              <a href="#contacto" className="bg-primary hover:bg-primaryhover text-white px-5 py-2 rounded-lg font-medium transition-all duration-300 text-xs">
-                Contactar
+              <a 
+                href="https://wa.me/34711208967?text=Hola%20Sofía,%20quiero%20más%20información%20sobre%20tus%20servicios" 
+                className="bg-primary hover:bg-primaryhover text-white px-5 py-2 rounded-lg font-medium transition-all duration-300 text-xs shadow-md shadow-primary/10"
+              >
+                Asesoría Gratuita
               </a>
             </div>
 
@@ -80,8 +83,12 @@ const Navbar = () => {
               <Link to="/admin/login" onClick={closeMenu} className="flex items-center justify-center gap-1.5 border border-white/10 text-gray-400 px-4 py-2.5 rounded-lg font-medium text-xs transition-all duration-300 hover:border-primary/50 hover:text-white">
                 <LogIn className="w-3.5 h-3.5" /> Iniciar Sesión
               </Link>
-              <a href="#contacto" onClick={closeMenu} className="bg-primary hover:bg-primaryhover text-white text-center px-5 py-2.5 rounded-lg font-medium text-xs transition-all duration-300">
-                Contactar
+              <a 
+                href="https://wa.me/34711208967?text=Hola%20Sofía,%20quiero%20más%20información%20sobre%20tus%20servicios" 
+                onClick={closeMenu} 
+                className="bg-primary hover:bg-primaryhover text-white text-center px-5 py-2.5 rounded-lg font-medium text-xs transition-all duration-300 shadow-md shadow-primary/10"
+              >
+                Asesoría Gratuita
               </a>
             </div>
           </div>
