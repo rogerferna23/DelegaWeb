@@ -19,6 +19,7 @@ import TermsAndConditions from './components/TermsAndConditions'
 import Copyright from './components/Copyright'
 import RefundPolicy from './components/RefundPolicy'
 import PrivateBooking from './components/PrivateBooking'
+import ScrollToTop from './components/ScrollToTop'
 import './App.css'
 
 // Admin panel
@@ -56,7 +57,9 @@ function PublicSite() {
 
 function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
       {/* Public website */}
       <Route
         path="/"
@@ -191,9 +194,9 @@ function App() {
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   )
 }
 
 export default App
-
