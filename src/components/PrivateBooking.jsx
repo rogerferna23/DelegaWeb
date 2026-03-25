@@ -34,7 +34,16 @@ const PrivateBooking = () => {
   return (
     <div className="min-h-screen bg-background text-white font-sans">
       <Navbar />
-      <main className="pt-20 pb-12">
+      <main className="pt-24 pb-12 px-4">
+        <div className="max-w-4xl mx-auto text-center mb-10">
+          <h1 className="text-3xl md:text-5xl font-bold mb-4">
+            Reserva tu <span className="text-primary">Sesión Estratégica</span>
+          </h1>
+          <p className="text-gray-400 text-lg">
+            Estás a un paso de transformar tu presencia digital. Elige el horario que mejor te convenga.
+          </p>
+        </div>
+
         <div className="p-0 max-w-[1020px] mx-auto overflow-hidden">
           {/* Contenedor sin bordes para integración total con el fondo */}
           <div className="w-full flex justify-center items-start overflow-hidden" style={{ height: '700px' }}>
