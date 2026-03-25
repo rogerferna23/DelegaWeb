@@ -4,21 +4,9 @@ import {
 } from 'recharts';
 import { DollarSign, TrendingUp, Package, Users } from 'lucide-react';
 import { useAdminVentas, useAdminVendors } from '../AdminDataContext';
+import { SERVICES_CATALOG } from '../../constants/services';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-const SERVICES_CATALOG = [
-  { name: 'Landing Pages', price: 299 },
-  { name: 'Web con panel de administración', price: 499 },
-  { name: 'Ecommerce', price: 999 },
-  { name: 'Campañas publicitarias', price: 299 },
-  { name: 'Mantenimiento web', price: 25 },
-  { name: 'Coaching de ventas', price: 300 },
-  { name: 'Marca & Sistema', price: 1900 },
-  { name: 'Plan Starter', price: 576 },
-  { name: 'Plan Pro', price: 1155 },
-  { name: 'Plan Elite', price: 1733 },
-];
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {

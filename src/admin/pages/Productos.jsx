@@ -1,19 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Package, Search, Calendar, Zap, LayoutDashboard, ShoppingCart, Wrench, Megaphone, Users, Rocket, DollarSign } from 'lucide-react';
+import { Package, Search, Calendar, ShoppingCart, Wrench, Megaphone, Users, Rocket, DollarSign } from 'lucide-react';
 import { useAdminVentas } from '../AdminDataContext';
-
-const SERVICES_CATALOG = [
-  { name: 'Landing Pages', category: 'Web', price: 299, icon: <Zap />, isPremium: false },
-  { name: 'Web con panel de administración', category: 'Web', price: 499, icon: <LayoutDashboard />, isPremium: false },
-  { name: 'Ecommerce', category: 'Web', price: 999, icon: <ShoppingCart />, isPremium: false, highlight: true },
-  { name: 'Campañas publicitarias', category: 'Marketing', price: 299, icon: <Megaphone />, isPremium: false, isMonthly: true },
-  { name: 'Mantenimiento web', category: 'Web', price: 25, icon: <Wrench />, isPremium: false, isMonthly: true },
-  { name: 'Coaching de ventas', category: 'Consultoría', price: 300, icon: <Users />, isPremium: false },
-  { name: 'Marca & Sistema', category: 'Programa', price: 1900, icon: <Rocket />, isPremium: true },
-  { name: 'Plan Starter', category: 'Suscripción', price: 576, icon: <Package />, isPremium: false, isMonthly: true },
-  { name: 'Plan Pro', category: 'Suscripción', price: 1155, icon: <Package />, isPremium: false, isMonthly: true, highlight: true },
-  { name: 'Plan Elite', category: 'Suscripción', price: 1733, icon: <Package />, isPremium: false, isMonthly: true },
-];
+import { SERVICES_CATALOG } from '../../constants/services';
 
 export default function Productos() {
   const { ventas } = useAdminVentas();

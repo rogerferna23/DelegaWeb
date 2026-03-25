@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { sanitizeText } from '../../lib/sanitize';
 import { CheckCircle, XCircle, Clock, User, UserPlus, UserMinus, AlertCircle } from 'lucide-react';
 
 function timeAgo(dateStr) {
@@ -47,7 +48,11 @@ export default function AdminRequests() {
       return;
     }
     setSubmitting(true);
-    const result = await requestAdminAction({ action: 'create_admin', ...form });
+    const result = await requestAdminAction({ 
+      action: 'create_admin', 
+      ...form,
+      targetName: sanitizeText(form.targetName)
+    });
     setSubmitting(false);
     if (result.success) {
       setForm({ targetName: '', targetEmail: '', targetRole: 'admin', targetPassword: '' });

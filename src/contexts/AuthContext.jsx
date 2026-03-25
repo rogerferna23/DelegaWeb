@@ -177,18 +177,13 @@ export function AuthProvider({ children }) {
         const target = users.find(u => u.email === req.target_email);
         if (target) await removeAdmin(target.id);
       } else if (req.action === 'add_expense') {
-        // Write gasto directly to localStorage
-        try {
-          const existing = JSON.parse(localStorage.getItem('dw_gastos_v2') || '[]');
-          const newGasto = {
-            id: Date.now().toString(),
-            description: req.target_name,
-            amount: parseFloat(req.target_email) || 0,
-            date: req.target_role,
-          };
-          const updated = [...existing, newGasto].sort((a, b) => new Date(a.date) - new Date(b.date));
-          localStorage.setItem('dw_gastos_v2', JSON.stringify(updated));
-        } catch (_) {}
+        // Write gasto to Supabase
+        const { error: gastoError } = await supabase.from('gastos').insert({
+          description: req.target_name,
+          amount: parseFloat(req.target_email) || 0,
+          date: req.target_role,
+        });
+        if (gastoError) return { success: false, error: gastoError.message };
       }
       // download_report: just mark approved — superadmin downloads from notification UI
     }

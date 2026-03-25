@@ -51,7 +51,7 @@ const Navbar = () => {
                 Iniciar Sesión
               </Link>
               <a 
-                href="https://wa.me/34711208967?text=Hola%20Sofía,%20quiero%20más%20información%20sobre%20tus%20servicios" 
+                href="https://wa.me/34711208967?text=Hola%20Sofía,%20vengo%20de%20la%20web%20y%20quiero%20recibir%20mi%20asesoría%20gratuita" 
                 className="bg-primary hover:bg-primaryhover text-white px-5 py-2 rounded-lg font-medium transition-all duration-300 text-xs shadow-md shadow-primary/10"
               >
                 Asesoría Gratuita
@@ -84,7 +84,7 @@ const Navbar = () => {
                 <LogIn className="w-3.5 h-3.5" /> Iniciar Sesión
               </Link>
               <a 
-                href="https://wa.me/34711208967?text=Hola%20Sofía,%20quiero%20más%20información%20sobre%20tus%20servicios" 
+                href="https://wa.me/34711208967?text=Hola%20Sofía,%20vengo%20de%20la%20web%20y%20quiero%20recibir%20mi%20asesoría%20gratuita" 
                 onClick={closeMenu} 
                 className="bg-primary hover:bg-primaryhover text-white text-center px-5 py-2.5 rounded-lg font-medium text-xs transition-all duration-300 shadow-md shadow-primary/10"
               >

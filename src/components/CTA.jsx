@@ -64,7 +64,7 @@ const CTA = () => {
  
         <div className="flex flex-col items-center gap-3 py-2">
           <a 
-            href="https://wa.me/34711208967?text=Hola%20Sofía,%20vengo%20de%20la%20web%20y%20quiero%20agendar%20mi%20asesoría%20gratuita" 
+            href="https://wa.me/34711208967?text=Hola%20Sofía,%20vengo%20de%20la%20web%20y%20quiero%20recibir%20mi%20asesoría%20gratuita" 
             className="inline-flex items-center gap-2.5 bg-green-600 hover:bg-green-500 text-white px-8 py-3.5 rounded-xl font-bold transition-all transform hover:scale-105 shadow-xl shadow-green-900/20 text-lg"
           >
             <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">

@@ -9,8 +9,10 @@ import {
   DollarSign, TrendingUp, Package
 } from 'lucide-react';
 import { useAdminVendors, useAdminGastos, useAdminVentas } from '../AdminDataContext';
+import { SERVICES_CATALOG } from '../../constants/services';
 import { exportToExcel } from '../../utils/exportExcel';
 import { useAuth } from '../../contexts/AuthContext';
+import { sanitizeText } from '../../lib/sanitize';
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MONTH_NAMES = [
@@ -75,18 +77,7 @@ export default function Reportes() {
     fecha: new Date().toISOString().slice(0, 10),
   };
   const WEB_SERVICES_LIST = ['Landing Pages', 'Web con panel de administración', 'Ecommerce'];
-  const ALL_SERVICES = [
-    { name: 'Landing Pages', price: 299 },
-    { name: 'Web con panel de administración', price: 499 },
-    { name: 'Ecommerce', price: 999 },
-    { name: 'Campañas publicitarias', price: 299 },
-    { name: 'Mantenimiento web', price: 25 }, // Base price, they can edit
-    { name: 'Coaching de ventas', price: 300 },
-    { name: 'Marca & Sistema', price: 1900 },
-    { name: 'Plan Starter', price: 576 },
-    { name: 'Plan Pro', price: 1155 },
-    { name: 'Plan Elite', price: 1733 },
-  ];
+  const ALL_SERVICES = SERVICES_CATALOG;
   const [ventaForm, setVentaForm] = useState(EMPTY_VENTA_FORM);
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState([]);
   const [ventaError, setVentaError] = useState('');
@@ -724,6 +715,8 @@ export default function Reportes() {
               
               addVenta({
                 ...ventaForm,
+                clienteNombre: sanitizeText(ventaForm.clienteNombre),
+                clienteEmail: sanitizeText(ventaForm.clienteEmail),
                 servicio: combinedServiceNames,
                 importe: parseFloat(ventaForm.importe),
                 moneda: 'USD',

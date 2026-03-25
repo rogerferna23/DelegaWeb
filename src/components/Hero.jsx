@@ -19,7 +19,7 @@ const Hero = () => {
       
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
         <a 
-          href="https://wa.me/34711208967?text=Hola%20Sofía,%20vengo%20de%20la%20web%20y%20quiero%20mi%20asesoría%20gratuita%20🎁" 
+          href="https://wa.me/34711208967?text=Hola%20Sofía,%20vengo%20de%20la%20web%20y%20quiero%20recibir%20mi%20asesoría%20gratuita" 
           className="w-full sm:w-auto bg-primary hover:bg-primaryhover text-white px-8 py-4 rounded-xl font-bold transition-all transform hover:scale-105 shadow-lg shadow-primary/20 text-lg"
         >
           Obtén tu asesoría gratuita
