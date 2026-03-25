@@ -34,30 +34,25 @@ const PrivateBooking = () => {
   return (
     <div className="min-h-screen bg-background text-white font-sans">
       <Navbar />
-      <main className="pt-20 pb-12 px-4">
-        <div className="max-w-4xl mx-auto text-center mb-8">
-          <h1 className="text-3xl md:text-5xl font-bold mb-4">
-            Reserva tu <span className="text-primary">Sesión Estratégica</span>
-          </h1>
-          <p className="text-gray-400 text-lg">
-            Estás a un paso de transformar tu presencia digital. Elige el horario que mejor te convenga.
-          </p>
-        </div>
-
-        <div className="w-full max-w-4xl mx-auto overflow-hidden rounded-2xl border border-gray-800 bg-black/20">
-          {/* Contenedor responsivo para Calendly */}
-          <div 
-            ref={containerRef}
-            className="calendly-inline-widget w-full"
-            style={{ 
-              minWidth: '320px',
-              height: '700px'
-            }}
-            data-auto-load="false"
-          ></div>
+      <main className="pt-20 pb-12">
+        <div className="p-0 max-w-[1020px] mx-auto overflow-hidden">
+          {/* Contenedor sin bordes para integración total con el fondo */}
+          <div className="w-full flex justify-center items-start overflow-hidden" style={{ height: '700px' }}>
+            <div 
+              ref={containerRef}
+              className="w-full"
+              style={{ 
+                width: '1060px', 
+                minWidth: '1060px', 
+                height: '780px', 
+                transform: 'scale(1.0)', 
+                transformOrigin: 'top center' 
+              }}
+            ></div>
+          </div>
         </div>
         
-        <div className="mt-6 text-center text-gray-500 text-[10px] opacity-30">
+        <div className="mt-2 text-center text-gray-500 text-[10px] opacity-30">
           <Link to="/" className="hover:text-primary transition-colors">Volver al inicio</Link>
         </div>
       </main>
