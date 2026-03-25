@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { HashRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { PayPalScriptProvider } from '@paypal/react-paypal-js'
 import { CartProvider } from './contexts/CartContext'
@@ -16,12 +16,12 @@ createRoot(document.getElementById('root')).render(
     intent: 'capture',
     components: 'buttons',
   }}>
-    <BrowserRouter>
+    <HashRouter>
       <AuthProvider>
         <CartProvider>
           <App />
         </CartProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   </PayPalScriptProvider>
 )
