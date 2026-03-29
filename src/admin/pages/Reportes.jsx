@@ -824,8 +824,9 @@ export default function Reportes() {
         )}
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Summary cards - balance final */}
+      <h3 className="text-[10px] font-bold text-gray-500 uppercase tracking-[0.2em] mb-1.5 mt-2 text-center">Resumen del Periodo</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         {[
           { label: 'Ingresos Totales', value: `$${totalIngresos.toLocaleString()}`, sub: 'Ventas pagadas', color: 'text-green-400', icon: <DollarSign className="w-3.5 h-3.5" /> },
           { label: 'Gastos Totales', value: `$${totalGastos.toLocaleString()}`, sub: `${gastos.length} registros`, color: 'text-red-400', icon: <TrendingUp className="w-3.5 h-3.5 rotate-180" /> },
