@@ -32,13 +32,13 @@ ${finalFooter}
   // Determine target(s)
   const targets = [];
   
-  // Add group if configured
+  // 1. Prioritize Group if configured (Stop sending to personal DMs)
   if (config.NOTIFICATIONS_GROUP_ID) {
     targets.push(config.NOTIFICATIONS_GROUP_ID);
-  }
-  
-  // Also add individual admin numbers for redundancy
-  if (config.ADMIN_NUMBERS && config.ADMIN_NUMBERS.length > 0) {
+    console.log('[Notifier] Usando Grupo de Notificaciones exclusivamente, omitiendo DMs personales.');
+  } 
+  // 2. Fallback to individual admin numbers if NO group is configured
+  else if (config.ADMIN_NUMBERS && config.ADMIN_NUMBERS.length > 0) {
     config.ADMIN_NUMBERS.forEach(num => {
       if (num) targets.push(`${num.replace(/\D/g, '')}@c.us`);
     });

@@ -25,7 +25,14 @@ function humanDelay(text = '') {
 async function handleMessage(client, msg) {
   // Only respond to private chats (not groups)
   const chat = await msg.getChat();
-  if (chat.isGroup) return;
+  if (chat.isGroup) {
+    // Hidden command for the group to get its own ID
+    if (msg.body === '!id') {
+      console.log(`[Info Grupo] ID del grupo "${chat.name}": ${chat.id._serialized}`);
+      await msg.reply(`El ID de este grupo es:\n*${chat.id._serialized}*\n\nCópialo y pégalo en tu archivo config.js en la variable NOTIFICATIONS_GROUP_ID.`);
+    }
+    return;
+  }
 
   // Only process text messages
   if (!msg.body || msg.body.trim() === '') return;
@@ -44,6 +51,22 @@ async function handleMessage(client, msg) {
     console.log('[BOT_MODE=manual] Logging only, not responding.');
     return;
   }
+
+  // --- COMANDO SECRETO PARA PROBAR REPORTES ---
+  if (userText.toLowerCase() === '!testreport') {
+    console.log('[Test] Triggering test report...');
+    await notifyRoger(client, { 
+      contactName,
+      contactNumber: contact.number || 'N/A',
+      chatId, 
+      summary: "Este es un reporte de prueba para verificar que los mensajes están llegando correctamente al grupo de WhatsApp. Si estás leyendo esto, Sofia IA está perfectamente conectada al grupo.",
+      title: "🧪 *Test de Notificación - Sofía IA*",
+      footer: "✅ Conexión con el grupo exitosa"
+    });
+    await msg.reply('✅ He enviado el reporte de prueba al grupo y a los números de los administradores configurados.');
+    return;
+  }
+  // --------------------------------------------
 
   try {
     // Track if client is asking about price

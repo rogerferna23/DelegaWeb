@@ -16,7 +16,7 @@ module.exports = {
   NOTIFICATIONS_GROUP_ID: '120363425256598785@g.us',
 
   // Link de agendamiento apuntando a la página privada de la web
-  MEETING_LINK: 'https://delega-web.vercel.app/#/sesion-estrategica',
+  MEETING_LINK: 'https://delegaweb.com/#/sesion-estrategica',
 
   // Delay simulado antes de responder (ms) — simula tiempo humano
   MIN_DELAY_MS: 2000,
