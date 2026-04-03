@@ -33,6 +33,9 @@ const Vendedores = lazy(() => import('./admin/pages/Vendedores'))
 const Reportes = lazy(() => import('./admin/pages/Reportes'))
 const Transacciones = lazy(() => import('./admin/pages/Transacciones'))
 const Campanas = lazy(() => import('./admin/pages/Campanas'))
+const CampanasOnboarding = lazy(() => import('./admin/pages/CampanasOnboarding'))
+const NuevaCampana = lazy(() => import('./admin/pages/NuevaCampana'))
+const DetalleCampana = lazy(() => import('./admin/pages/DetalleCampana'))
 const Configuracion = lazy(() => import('./admin/pages/Configuracion'))
 const AuditLog = lazy(() => import('./admin/pages/AuditLog'))
 const AdminRequests = lazy(() => import('./admin/pages/AdminRequests'))
@@ -175,6 +178,9 @@ function App() {
             <Route path="postulantes" element={<Postulantes />} />
             <Route path="reportes" element={<Reportes />} />
             <Route path="campanas" element={<Campanas />} />
+            <Route path="campanas/onboarding" element={<CampanasOnboarding />} />
+            <Route path="campanas/nueva" element={<NuevaCampana />} />
+            <Route path="campanas/:id" element={<DetalleCampana />} />
             <Route path="solicitudes" element={<AdminRequests />} />
             <Route
               path="auditoria"

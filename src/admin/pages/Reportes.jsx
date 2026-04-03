@@ -72,6 +72,9 @@ export default function Reportes() {
   const EMPTY_VENTA_FORM = {
     clienteNombre: '',
     clienteEmail: '',
+    clienteTelefono: '',
+    campanaOrigen: '',
+    notas: '',
     importe: '', // We will auto-calculate this but allow override
     prioridad: false,
     fecha: new Date().toISOString().slice(0, 10),
@@ -83,6 +86,14 @@ export default function Reportes() {
   const [ventaError, setVentaError] = useState('');
   const [confirmDeleteVenta, setConfirmDeleteVenta] = useState(null);
   const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const [isCampaignDropdownOpen, setIsCampaignDropdownOpen] = useState(false);
+
+  const CAMPAIGN_OPTIONS = [
+    { value: 'cold_entrepreneurs', label: 'Tráfico Frío - Emprendedores' },
+    { value: 'retargeting_hot', label: 'Retargeting General' },
+    { value: 'organic_social', label: 'Orgánico (No campaña)' },
+    { value: 'referral', label: 'Recomendación' },
+  ];
   
   // A sale is considered 'web' if ANY of the selected services is a web service
   const isWebVenta = serviciosSeleccionados.some(sel => 
@@ -613,7 +624,7 @@ export default function Reportes() {
 
             {/* Client name */}
             <div>
-              <label className="text-[10px] text-gray-500 mb-1 block">Nombre cliente</label>
+              <label className="text-[10px] text-gray-500 mb-1 block">Nombre cliente *</label>
               <input
                 type="text"
                 placeholder="Juan García"
@@ -624,12 +635,77 @@ export default function Reportes() {
             </div>
             {/* Client email */}
             <div>
-              <label className="text-[10px] text-gray-500 mb-1 block">Email cliente</label>
+              <label className="text-[10px] text-gray-500 mb-1 block">Email cliente *</label>
               <input
                 type="email"
                 placeholder="juan@email.com"
                 value={ventaForm.clienteEmail}
                 onChange={e => setVentaForm(p => ({ ...p, clienteEmail: e.target.value }))}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            {/* Client phone */}
+            <div>
+              <label className="text-[10px] text-gray-500 mb-1 block">Teléfono (WhatsApp)</label>
+              <input
+                type="tel"
+                placeholder="+52 123 456 7890"
+                value={ventaForm.clienteTelefono}
+                onChange={e => setVentaForm(p => ({ ...p, clienteTelefono: e.target.value }))}
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/50"
+              />
+            </div>
+            {/* Origin Custom Dropdown */}
+            <div>
+              <label className="text-[10px] text-gray-500 mb-1 block">Campaña de origen *</label>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsCampaignDropdownOpen(!isCampaignDropdownOpen)}
+                  className="w-full flex items-center justify-between bg-white/5 border border-white/10 hover:border-white/20 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/50 transition-colors text-left"
+                >
+                  <span className={ventaForm.campanaOrigen ? "text-white" : "text-gray-400"}>
+                    {ventaForm.campanaOrigen 
+                      ? CAMPAIGN_OPTIONS.find(o => o.value === ventaForm.campanaOrigen)?.label || 'Seleccionado'
+                      : 'Selecciona la campaña...'}
+                  </span>
+                  <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isCampaignDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isCampaignDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setIsCampaignDropdownOpen(false)}></div>
+                    <div className="absolute z-20 w-full mt-1.5 bg-[#161618] border border-white/10 rounded-lg shadow-xl overflow-hidden py-1.5 max-h-56 overflow-y-auto custom-scrollbar">
+                      {CAMPAIGN_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => {
+                            setVentaForm(p => ({ ...p, campanaOrigen: opt.value }));
+                            setIsCampaignDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                            ventaForm.campanaOrigen === opt.value
+                              ? 'bg-primary/20 text-primary'
+                              : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+            {/* Notes */}
+            <div className="col-span-2">
+              <label className="text-[10px] text-gray-500 mb-1 block">Notas cortas</label>
+              <textarea
+                rows={2}
+                placeholder="Contexto del cliente o de la venta..."
+                value={ventaForm.notas}
+                onChange={e => setVentaForm(p => ({ ...p, notas: e.target.value }))}
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/50"
               />
             </div>

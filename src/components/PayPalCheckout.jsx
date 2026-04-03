@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PayPalButtons } from '@paypal/react-paypal-js';
-import { X, CheckCircle, AlertCircle, ShieldCheck } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, ShieldCheck, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { sendSaleNotification } from '../services/emailService';
 
@@ -9,7 +9,7 @@ import { sendSaleNotification } from '../services/emailService';
 const PAYPAL_CLIENT_ID = import.meta.env.VITE_PAYPAL_CLIENT_ID || 'test';
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function recordSale({ service, price, currency, payerName, payerEmail, orderId }) {
+async function recordSale({ service, price, currency, payerName, payerEmail, payerPhone, campaignSource, projectNotes, orderId }) {
   try {
     const { error } = await supabase.from('ventas').insert({
       servicio: service,
@@ -17,6 +17,9 @@ async function recordSale({ service, price, currency, payerName, payerEmail, ord
       moneda: currency,
       cliente_nombre: payerName,
       cliente_email: payerEmail,
+      cliente_telefono: payerPhone,
+      campana_origen: campaignSource,
+      notas: projectNotes,
       paypal_order_id: orderId,
       estado: 'pagado',
     });
@@ -50,6 +53,20 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
   const [dbSyncError, setDbSyncError] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
 
+  // Form Fields
+  const [payerPhone, setPayerPhone] = useState('');
+  const [campaignSource, setCampaignSource] = useState('');
+  const [projectNotes, setProjectNotes] = useState('');
+  const [isCampaignDropdownOpen, setIsCampaignDropdownOpen] = useState(false);
+
+  const CAMPAIGN_OPTIONS = [
+    { value: 'cold_entrepreneurs', label: 'Anuncio de Facebook / Meta' },
+    { value: 'organic_social', label: 'Redes Sociales (Orgánico)' },
+    { value: 'search_engine', label: 'Búsqueda en Google' },
+    { value: 'referral', label: 'Recomendación de un conocido' },
+    { value: 'other', label: 'Otro' },
+  ];
+
   if (!cartItems || cartItems.length === 0) return null;
 
   // Detect if any item in the cart is a web service that supports priority delivery
@@ -70,7 +87,7 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-md bg-[#0d0d0f] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-md bg-[#0d0d0f] border border-white/10 rounded-2xl shadow-2xl overflow-visible">
 
         {/* Close */}
         <button
@@ -122,6 +139,76 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
                   <span className="text-[10px] opacity-70">2 días hábiles</span>
                   <span className="text-[10px] font-semibold mt-1">+$100 USD</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* User information (Phone, Campaign, Notes) */}
+          {status !== 'success' && status !== 'error' && (
+            <div className="mb-5 space-y-3 relative z-[30]">
+              <div>
+                <label className="text-[10px] text-gray-500 mb-1 block">Teléfono (WhatsApp) *</label>
+                <input
+                  type="tel"
+                  placeholder="+52 123 456 7890"
+                  value={payerPhone}
+                  onChange={e => setPayerPhone(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/50"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-[10px] text-gray-500 mb-1 block">¿Cómo nos conociste? *</label>
+                  <div className="relative z-[40]">
+                    <button
+                      type="button"
+                      onClick={() => setIsCampaignDropdownOpen(!isCampaignDropdownOpen)}
+                      className="w-full flex items-center justify-between bg-white/5 border border-white/10 hover:border-white/20 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/50 transition-colors text-left"
+                    >
+                      <span className={campaignSource ? "text-white" : "text-gray-400"}>
+                        {campaignSource 
+                          ? CAMPAIGN_OPTIONS.find(o => o.value === campaignSource)?.label || 'Seleccionado'
+                          : 'Selecciona...'}
+                      </span>
+                      <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isCampaignDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isCampaignDropdownOpen && (
+                      <>
+                        <div className="fixed inset-0 z-[60]" onClick={() => setIsCampaignDropdownOpen(false)}></div>
+                        <div className="absolute z-[70] w-full mt-1.5 bg-[#161618] border border-white/10 rounded-lg shadow-xl overflow-hidden py-1.5 max-h-56 overflow-y-auto custom-scrollbar">
+                          {CAMPAIGN_OPTIONS.map(opt => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => {
+                                setCampaignSource(opt.value);
+                                setIsCampaignDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                                campaignSource === opt.value
+                                  ? 'bg-primary/20 text-primary'
+                                  : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="text-[10px] text-gray-500 mb-1 block">Notas / Requerimientos</label>
+                  <input
+                    type="text"
+                    placeholder="Breve detalle..."
+                    value={projectNotes}
+                    onChange={e => setProjectNotes(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/50"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -193,7 +280,7 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
 
           {/* PayPal buttons */}
           {status !== 'success' && status !== 'error' && (
-            <>
+            <div className="relative z-[10]">
               <PayPalButtons
                 style={{ layout: 'vertical', color: 'gold', shape: 'rect', label: 'pay', height: 44 }}
                 disabled={status === 'processing'}
@@ -220,6 +307,9 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
                       currency,
                       payerName: `${payerData.name?.given_name} ${payerData.name?.surname}`,
                       payerEmail: payerData.email_address,
+                      payerPhone,
+                      campaignSource,
+                      projectNotes,
                       orderId: order.id,
                     });
 
@@ -238,7 +328,7 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
                 }}
                 onCancel={() => setStatus('idle')}
               />
-            </>
+            </div>
           )}
 
           {/* Security note */}

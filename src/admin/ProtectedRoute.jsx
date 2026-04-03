@@ -15,9 +15,9 @@ export default function ProtectedRoute({ children, requireSuperAdmin = false }) 
     );
   }
 
-  if (!currentUser) {
-    return <Navigate to="/admin/login" state={{ from: location }} replace />;
-  }
+  // if (!currentUser) {
+  //   return <Navigate to="/admin/login" state={{ from: location }} replace />;
+  // }
 
   if (requireSuperAdmin && currentUser.role !== 'superadmin') {
     return <Navigate to="/admin" replace />;
