@@ -3,7 +3,7 @@ import { Sparkles, Minus, Plus, Search, CheckCircle2, Loader2 } from 'lucide-rea
 import { supabase } from '../../lib/supabase';
 
 export default function GeneradorCopyAI({ onSelectCopy, context }) {
-  const [isOpen, setIsOpen] = useState(false);
+
   const [count, setCount] = useState(3);
   const [isGenerating, setIsGenerating] = useState(false);
   const [results, setResults] = useState(null);
@@ -38,21 +38,26 @@ NO incluyas explicaciones, solo el JSON.`;
       });
 
       if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
       // El backend debe devolver el JSON parseado en el campo 'message' o similar
-      // Si el backend devuelve texto plano con el JSON dentro, lo parseamos
-      let generated;
-      if (typeof data.message === 'string') {
-        const jsonMatch = data.message.match(/\[[\s\S]*\]/);
-        generated = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-      } else {
-        generated = data.message || [];
+      let generated = [];
+      try {
+        if (typeof data.message === 'string') {
+          const jsonMatch = data.message.match(/\[[\s\S]*\]/);
+          generated = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+        } else {
+          generated = data.message || [];
+        }
+      } catch (parseErr) {
+        console.error('Error parseando JSON de IA:', parseErr);
+        throw new Error('La IA devolvió un formato no válido. Intenta de nuevo.');
       }
 
       setResults(generated);
     } catch (err) {
       console.error('Error generando copy:', err);
-      alert('Hubo un error al generar los textos. Por favor intenta de nuevo.');
+      alert(`Error: ${err.message || 'Hubo un error al generar los textos. Por favor intenta de nuevo.'}`);
     } finally {
       setIsGenerating(false);
     }
@@ -67,59 +72,53 @@ NO incluyas explicaciones, solo el JSON.`;
 
   return (
     <div className="relative mt-2">
-      {!isOpen && !results && (
-        <button 
-          type="button"
-          onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Sparkles className="w-4 h-4" />
-          Generar copy con IA
-        </button>
-      )}
-
-      {/* Popover de Configuración */}
-      {isOpen && !results && !isGenerating && (
-        <div className="mt-2 p-4 bg-background border border-white/10 rounded-xl shadow-lg max-w-sm inline-block">
-          <div className="text-sm text-gray-300 font-medium mb-3">¿Cuántas variaciones deseas generar?</div>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="flex items-center bg-cardbg border border-white/10 rounded-lg">
+      {/* Selector de Configuración Directo */}
+      {!results && !isGenerating && (
+        <div className="mt-2 p-5 bg-background/50 border border-white/10 rounded-2xl shadow-xl max-w-md">
+          <div className="flex items-center gap-3 mb-4">
+             <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+               <Sparkles className="w-4 h-4 text-primary" />
+             </div>
+             <div>
+               <h3 className="text-sm font-bold text-white">¿Cuántas variaciones deseas generar?</h3>
+               <p className="text-[10px] text-gray-500">Claude redactará opciones basadas en tu contexto.</p>
+             </div>
+          </div>
+          
+          <div className="flex items-center gap-6 mb-5">
+            <div className="flex items-center bg-cardbg border border-white/10 rounded-xl p-1">
               <button 
                 type="button"
                 onClick={() => setCount(Math.max(1, count - 1))}
-                className="p-2 text-gray-400 hover:text-white transition-colors"
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
               >
                 <Minus className="w-4 h-4" />
               </button>
-              <div className="w-8 text-center text-white font-medium text-sm">{count}</div>
+              <div className="w-10 text-center text-white font-bold text-base">{count}</div>
               <button 
                 type="button"
                 onClick={() => setCount(Math.min(5, count + 1))}
-                className="p-2 text-gray-400 hover:text-white transition-colors"
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
               >
                 <Plus className="w-4 h-4" />
               </button>
             </div>
-            <span className="text-xs text-gray-500">(Máximo 5)</span>
+            <div className="text-[10px] text-gray-400 italic">Máximo 5 por cada solicitud</div>
           </div>
           
-          <div className="flex gap-2">
-            <button 
-              type="button"
-              onClick={() => setIsOpen(false)}
-              className="flex-1 px-3 py-2 bg-cardbg hover:bg-white/5 border border-white/5 text-gray-400 rounded-lg text-sm transition-colors"
-            >
-              Cancelar
-            </button>
-            <button 
-              type="button"
-              onClick={handleGenerate}
-              className="flex-1 px-3 py-2 bg-primary hover:bg-primaryhover text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              Generar
-            </button>
-          </div>
+          <button 
+            type="button"
+            onClick={handleGenerate}
+            disabled={!context?.offer}
+            className={`w-full py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg
+              ${!context?.offer ? 'bg-gray-800 text-gray-500 cursor-not-allowed' : 'bg-primary hover:bg-primaryhover text-white shadow-primary/20'}`}
+          >
+            <Sparkles className="w-4 h-4" />
+            Generar Estrategia de Copy
+          </button>
+          {!context?.offer && (
+            <p className="text-[10px] text-orange-500 mt-2 text-center">⚠ Completa el Contexto (Paso 1) primero</p>
+          )}
         </div>
       )}
 

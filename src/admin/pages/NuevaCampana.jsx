@@ -110,14 +110,18 @@ export default function NuevaCampana() {
       };
 
       let result;
-      // Si el nombre cambió respecto al perfil seleccionado, creamos uno nuevo (punto 1 del usuario)
-      const selectedProfile = profiles.find(p => p.id === formData.business_profile_id);
-      const isNewName = !selectedProfile || selectedProfile.company_name !== formData.company_name;
-
-      if (isNewName) {
-        result = await supabase.from('business_profiles').insert([profileData]).select();
+      // 1. Buscar si ya existe un perfil con ese nombre para este usuario
+      const existingProfileByName = profiles.find(p => p.company_name.toLowerCase() === formData.company_name.toLowerCase());
+      
+      if (existingProfileByName) {
+        // Actualizar el existente
+        result = await supabase.from('business_profiles')
+          .update(profileData)
+          .eq('id', existingProfileByName.id)
+          .select();
       } else {
-        result = await supabase.from('business_profiles').update(profileData).eq('id', formData.business_profile_id).select();
+        // Insertar nuevo
+        result = await supabase.from('business_profiles').insert([profileData]).select();
       }
 
       if (result.error) throw result.error;
@@ -140,6 +144,45 @@ export default function NuevaCampana() {
     if (step === 1) {
       const saved = await saveProfile();
       if (!saved) return;
+
+      // RECOMENDACIONES DE LA IA: Pre-llenado de pasos siguientes
+      setFormData(prev => {
+        const newData = { ...prev };
+        
+        // Sugerir Nombre de Campaña
+        if (!newData.name) {
+          const dateStr = new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
+          newData.name = `Camp. ${prev.company_name} - ${dateStr}`;
+        }
+
+        // Sugerir Presupuesto basado en el rango de precio
+        if (!newData.daily_budget || newData.daily_budget === 10) {
+          if (prev.price_range.includes('5,000') || prev.price_range.includes('2,000')) newData.daily_budget = 30;
+          else if (prev.price_range.includes('500')) newData.daily_budget = 15;
+          else newData.daily_budget = 5;
+        }
+
+        // Sugerir Edades basada en Cliente Ideal
+        const clientText = prev.ideal_client.toLowerCase();
+        if (clientText.includes('dueño') || clientText.includes('emprendedor') || clientText.includes('profesional')) {
+          newData.audience_age_min = 25;
+          newData.audience_age_max = 55;
+        } else if (clientText.includes('joven') || clientText.includes('estudiante')) {
+          newData.audience_age_min = 18;
+          newData.audience_age_max = 30;
+        }
+
+        // Sugerir Intereses iniciales (Simulado por ahora, se puede expandir)
+        if (newData.interests.length === 0) {
+          if (clientText.includes('negocio') || clientText.includes('venta')) {
+            newData.interests = ['Espíritu empresarial', 'Pequeñas empresas'];
+          } else if (clientText.includes('tecnología') || clientText.includes('software')) {
+            newData.interests = ['Tecnología', 'Gadgets'];
+          }
+        }
+
+        return newData;
+      });
     }
     setStep(prev => Math.min(5, prev + 1));
   };
