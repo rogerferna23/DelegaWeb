@@ -129,7 +129,7 @@ export default function NuevaCampana() {
       return true;
     } catch (err) {
       console.error('Error guardando perfil:', err);
-      alert('Error al guardar el perfil del negocio');
+      alert(`Error: ${err.message || 'No se pudo guardar el perfil del negocio'}`);
       return false;
     } finally {
       setIsSavingProfile(false);
