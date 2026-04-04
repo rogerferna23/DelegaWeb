@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, X, Send, Sparkles, BarChart2, MessageSquare, Target, Zap, Brain, Loader2 } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../../lib/supabase';
 
 export default function AIChatPanel({ isVisible, setVisible }) {
   const [messages, setMessages] = useState([
