@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { sanitizeText } from '../../lib/sanitize';
 import { Plus, Trash2, Shield, UserCheck, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import ClaudeModelSelector from '../components/ClaudeModelSelector';
 
 const ROLE_LABELS = { superadmin: 'Super Admin', admin: 'Administrador' };
 const ROLE_COLORS = {
@@ -197,6 +198,9 @@ export default function Configuracion() {
             </button>
           </form>
         </div>
+
+        {/* AI Settings */}
+        <ClaudeModelSelector />
       </div>
     </div>
   );

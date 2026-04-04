@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Bot, X, Send, Sparkles, BarChart2, MessageSquare, Target } from 'lucide-react';
+import { Bot, X, Send, Sparkles, BarChart2, MessageSquare, Target, Zap, Brain, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function AIChatPanel({ isVisible, setVisible }) {
   const [messages, setMessages] = useState([
@@ -11,6 +12,7 @@ export default function AIChatPanel({ isVisible, setVisible }) {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeModel, setActiveModel] = useState({ name: 'Cargando...', icon: Sparkles });
   const messagesEndRef = useRef(null);
 
   // Auto-scroll
@@ -22,6 +24,34 @@ export default function AIChatPanel({ isVisible, setVisible }) {
     scrollToBottom();
   }, [messages, isLoading]);
 
+  useEffect(() => {
+    if (isVisible) fetchActiveModel();
+  }, [isVisible]);
+
+  const fetchActiveModel = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('user_preferences')
+        .select('preferred_claude_model')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const modelId = data?.preferred_claude_model || 'claude-sonnet-4-6';
+      const modelMap = {
+        'claude-haiku-4-5-20251001': { name: 'Haiku 4.5', icon: Zap, color: 'text-blue-400' },
+        'claude-sonnet-4-6': { name: 'Sonnet 4.6', icon: Sparkles, color: 'text-primary' },
+        'claude-opus-4-6': { name: 'Opus 4.6', icon: Brain, color: 'text-purple-400' },
+        'gpt-5-4': { name: 'GPT 5.4', icon: Bot, color: 'text-green-400' }
+      };
+      setActiveModel(modelMap[modelId] || modelMap['claude-sonnet-4-6']);
+    } catch (err) {
+      console.error('Error fetching active model:', err);
+    }
+  };
+
 
   const quickSuggestions = [
     { label: "Analizar CPM", message: "Analiza el CPM de mis campañas, ¿cuál debo optimizar?", icon: Target },
@@ -30,7 +60,7 @@ export default function AIChatPanel({ isVisible, setVisible }) {
     { label: "Resumen Semanal", message: "Dame un resumen del rendimiento de los últimos 7 días", icon: BarChart2 },
   ];
 
-  const handleSend = (text = null) => {
+  const handleSend = async (text = null) => {
     const textToSend = text || input;
     if (!textToSend.trim()) return;
 
@@ -38,23 +68,26 @@ export default function AIChatPanel({ isVisible, setVisible }) {
     setMessages(prev => [...prev, { role: 'user', content: textToSend }]);
     setIsLoading(true);
 
-    // Mock Response (Simula que toca a la Edge Function)
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: { message: textToSend }
+      });
+
+      if (error) throw error;
       
-      const lowerText = textToSend.toLowerCase();
-      if (lowerText.includes('optimizar') || lowerText.includes('cpm') || lowerText.includes('analizar')) {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: 'He detectado que la campaña **Tráfico frío - Emprendedores** tiene un CPM de $2.08, un 15% superior al promedio de tu cuenta.\n\n**Instrucciones para optimizar en Meta Ads Manager:**\n1. Ve a la campaña en Meta.\n2. En el nivel de Conjunto de Anuncios, desactiva la segmentación detallada Advantage.\n3. Agrega manualmente los intereses: *Pequeña Empresa* y *Marketing Digital*.\n4. Verifica que el presupuesto se mantenga en $25/día.\n\n¿Quieres que te redacte un nuevo copy para acompañar estos cambios?'
-        }]);
-      } else {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: 'Entendido. Basado en tus métricas actuales de Meta Ads, aquí tienes mi recomendación estratégica...'
-        }]);
-      }
-    }, 1500);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: data.message || 'Lo siento, no pude procesar tu mensaje.' 
+      }]);
+    } catch (err) {
+      console.error('Error en AI Chat:', err);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: 'Hubo un error al conectar con el estratega IA. Por favor, verifica tu conexión o intenta de nuevo.' 
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -85,11 +118,17 @@ export default function AIChatPanel({ isVisible, setVisible }) {
         
         {/* Header */}
         <div className="p-4 border-b border-white/5 flex justify-between items-center bg-background/50 backdrop-blur-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
-            <span className="font-bold text-white text-xs uppercase tracking-widest">Estratega IA</span>
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/10 ${activeModel.color}`}>
+              <activeModel.icon className="w-3 h-3" />
+              <span className="text-[10px] font-bold uppercase tracking-tight">{activeModel.name}</span>
+            </div>
           </div>
-          <button onClick={() => setVisible(false)} className="text-gray-400 hover:text-white pb-0.5 transition-colors p-1 hover:bg-white/5 rounded-lg">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse"></div>
+            <span className="font-bold text-white text-[10px] uppercase tracking-widest opacity-70">Estratega IA</span>
+          </div>
+          <button onClick={() => setVisible(false)} className="text-gray-400 hover:text-white pb-0.5 transition-colors p-1 hover:bg-white/5 rounded-lg ml-auto">
             <X className="w-4 h-4" />
           </button>
         </div>

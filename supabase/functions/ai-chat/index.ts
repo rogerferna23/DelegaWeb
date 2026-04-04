@@ -89,6 +89,15 @@ serve(async (req: Request) => {
 `;
     }
 
+    // 2.7 Recuperar Preferencia de Modelo del Usuario
+    const { data: userPref } = await supabase
+      .from('user_preferences')
+      .select('preferred_claude_model')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    
+    const modelToUse = userPref?.preferred_claude_model || 'claude-sonnet-4-6';
+
     // 3. Generar System Prompt Integral
     const systemPrompt = `Eres el asistente experto en Meta Ads de DelegaWeb.
 Tus recomendaciones son ESTRATÉGICAS y no ejecutas cambios directamente en la API (Modo Solo Lectura).
@@ -106,40 +115,75 @@ ${metricsContext || 'No hay datos de campañas registrados.'}
 [FIN DE DATOS]
 `;
 
-    // 4. Solicitar Predicción a Claude
+    // 4. Solicitar Predicción a la IA (Anthropic o OpenAI)
     formattedHistory.push({ role: 'user', content: message });
 
-    const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": Deno.env.get('ANTHROPIC_API_KEY')!,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-         model: "claude-3-5-sonnet-20240620",
-         max_tokens: 1540,
-         system: is_copy_generation ? "Eres un redactor creativo experto en Meta Ads. Genera solo el JSON solicitado sin explicaciones." : systemPrompt,
-         messages: is_copy_generation ? [{ role: 'user', content: message }] : formattedHistory
-      })
-    });
+    let fullText = '';
+    let usage = { input_tokens: 0, output_tokens: 0 };
 
-    if (!anthropicResponse.ok) {
-       const errResponse = await anthropicResponse.text();
-       throw new Error(`Anthropic API Error: ${errResponse}`);
+    if (modelToUse.startsWith('gpt-')) {
+      // LLAMADA A OPENAI
+      const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
+        },
+        body: JSON.stringify({
+          model: modelToUse,
+          messages: is_copy_generation 
+            ? [{ role: 'system', content: "Eres un redactor creativo experto en Meta Ads. Genera solo el JSON solicitado sin explicaciones." }, { role: 'user', content: message }]
+            : [{ role: 'system', content: systemPrompt }, ...formattedHistory],
+          temperature: 0.7,
+        })
+      });
+
+      if (!openaiResponse.ok) {
+        const err = await openaiResponse.text();
+        throw new Error(`OpenAI API Error: ${err}`);
+      }
+
+      const openaiData = await openaiResponse.json();
+      fullText = openaiData.choices[0].message.content;
+      usage = { 
+        input_tokens: openaiData.usage.prompt_tokens, 
+        output_tokens: openaiData.usage.completion_tokens 
+      };
+    } else {
+      // LLAMADA A ANTHROPIC (CLAUDE)
+      const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": Deno.env.get('ANTHROPIC_API_KEY')!,
+          "anthropic-version": "2023-06-01"
+        },
+        body: JSON.stringify({
+           model: modelToUse,
+           max_tokens: 1540,
+           system: is_copy_generation ? "Eres un redactor creativo experto en Meta Ads. Genera solo el JSON solicitado sin explicaciones." : systemPrompt,
+           messages: is_copy_generation ? [{ role: 'user', content: message }] : formattedHistory
+        })
+      });
+
+      if (!anthropicResponse.ok) {
+         const errResponse = await anthropicResponse.text();
+         throw new Error(`Anthropic API Error: ${errResponse}`);
+      }
+
+      const anthropicData = await anthropicResponse.json();
+      fullText = anthropicData.content.find((c: any) => c.type === 'text')?.text || '';
+      usage = { 
+        input_tokens: anthropicData.usage.input_tokens, 
+        output_tokens: anthropicData.usage.output_tokens 
+      };
     }
-
-    const anthropicData = await anthropicResponse.json();
-    const fullText = anthropicData.content.find((c: any) => c.type === 'text')?.text || '';
-    
-    // Registro de Consumo
-    const usage = anthropicData.usage || { input_tokens: 0, output_tokens: 0 };
     await supabase.from('ai_usage_log').insert({
        user_id: user.id,
        endpoint: '/v1/messages',
        input_tokens: usage.input_tokens,
        output_tokens: usage.output_tokens,
-       model: "claude-3-5-sonnet-20240620"
+       model: modelToUse
     });
 
     // 5. Preparar Mensaje para el Chat (Sin parseo de acciones ya que estamos en Read-Only)
