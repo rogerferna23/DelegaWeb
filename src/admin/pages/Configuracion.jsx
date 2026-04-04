@@ -119,6 +119,11 @@ export default function Configuracion() {
               })}
             </div>
           </div>
+
+          {/* AI Settings - Moved here */}
+          <div className="mt-5">
+            <ClaudeModelSelector />
+          </div>
         </div>
 
         {/* Add admin form */}
@@ -198,9 +203,6 @@ export default function Configuracion() {
             </button>
           </form>
         </div>
-
-        {/* AI Settings */}
-        <ClaudeModelSelector />
       </div>
     </div>
   );
