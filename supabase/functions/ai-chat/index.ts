@@ -1,5 +1,9 @@
+// @ts-ignore
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+// @ts-ignore
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+
+declare const Deno: any;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +37,7 @@ serve(async (req: Request) => {
       .limit(20);
       
     // Anthropic espera el historial en orden cronológico (ancianos primero)
-    const formattedHistory = (historyData || []).reverse().map(msg => ({
+    const formattedHistory = (historyData || []).reverse().map((msg: any) => ({
       role: msg.role === 'system' ? 'assistant' : msg.role, 
       content: msg.content
     }));
@@ -52,11 +56,11 @@ serve(async (req: Request) => {
     let metricsContext = '';
 
     if (campaigns && campaigns.length > 0) {
-       metricsContext = campaigns.map(c => {
+       metricsContext = campaigns.map((c: any) => {
          const insights = c.campaign_insights || [];
-         const totalSpend = insights.reduce((acc, curr) => acc + (curr.spend || 0), 0);
-         const totalMsgs = insights.reduce((acc, curr) => acc + (curr.messages || 0), 0);
-         const avgCtr = insights.length ? insights.reduce((acc, curr) => acc + (curr.ctr || 0), 0) / insights.length : 0;
+         const totalSpend = insights.reduce((acc: number, curr: any) => acc + (curr.spend || 0), 0);
+         const totalMsgs = insights.reduce((acc: number, curr: any) => acc + (curr.messages || 0), 0);
+         const avgCtr = insights.length ? insights.reduce((acc: number, curr: any) => acc + (curr.ctr || 0), 0) / insights.length : 0;
          const avgCpm = totalMsgs > 0 ? (totalSpend / totalMsgs).toFixed(2) : 0;
          
          return `- Campaña [${c.id}]: "${c.name}" | Estado: ${c.status} | Presup.: $${c.daily_budget} | Gasto: $${totalSpend} | Msjs: ${totalMsgs} | CPM: $${avgCpm} | CTR: ${avgCtr.toFixed(2)}%`;
@@ -214,8 +218,8 @@ ${metricsContext || 'No hay métricas registradas todavía. Habla sobre estrateg
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error.message || 'Error desconocido' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400
     });
