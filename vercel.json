@@ -12,7 +12,7 @@
         { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
         { "key": "X-DNS-Prefetch-Control", "value": "off" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://assets.calendly.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://api.openai.com https://api.runwayml.com; frame-src 'self' https://calendly.com https://*.facebook.com; upgrade-insecure-requests;" }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.paypal.com https://*.paypalobjects.com https://assets.calendly.com https://*.supabase.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.paypal.com; font-src 'self' https://fonts.gstatic.com https://*.paypalobjects.com; img-src 'self' data: blob: https://*.paypal.com https://*.paypalobjects.com https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paypal.com https://www.sandbox.paypal.com https://*.braintree-api.com ws: wss: http://localhost:* http://127.0.0.1:*; frame-src 'self' https://*.paypal.com https://calendly.com https://*.facebook.com; upgrade-insecure-requests;" }
       ]
     }
   ],
