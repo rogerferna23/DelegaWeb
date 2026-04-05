@@ -56,42 +56,53 @@ serve(async (req) => {
     console.warn("Redis issue or timeout, skipping limiter:", e.message);
   }
 
-  // Auth con cliente ANON (respeta RLS)
-  const supabaseAnon = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!
-  );
+  // Auth con cliente ANON
+  try {
+    const supabaseAnon = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!
+    );
 
-  const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
 
-  // Logs asíncronos con SERVICE_ROLE para auditoría
-  const supabaseService = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
+    // Logs asíncronos (No bloqueantes)
+    const supabaseService = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-  // No bloqueamos la respuesta esperando el log
-  supabaseService.from("activity_logs").insert({
-    user_id: data?.user?.id || null,
-    action: "login",
-    status: error ? "failed" : "success",
-    severity: error ? "WARN" : "INFO",
-    details: { email, ip: clientIP, user_agent: req.headers.get("user-agent") },
-    ip_address: clientIP
-  }).then(({ error: logErr }) => {
-    if (logErr) console.error("Log error:", logErr);
-  });
+    supabaseService.from("activity_logs").insert({
+      user_id: data?.user?.id || null,
+      action: "login",
+      status: error ? "failed" : "success",
+      severity: error ? "WARN" : "INFO",
+      details: { email, ip: clientIP, user_agent: req.headers.get("user-agent") },
+      ip_address: clientIP
+    }).catch(e => console.error("Log error:", e.message));
 
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { 
-      status: 401, 
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), { 
+        status: 401, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+
+    if (!data?.session) {
+      return new Response(JSON.stringify({ error: "Sesión no generada." }), { 
+        status: 500, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      });
+    }
+
+    return new Response(JSON.stringify(data), { 
+      status: 200, 
+      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: "Error interno de seguridad: " + e.message }), { 
+      status: 500, 
       headers: { ...corsHeaders, "Content-Type": "application/json" } 
     });
   }
-
-  return new Response(JSON.stringify(data), { 
-    status: 200, 
-    headers: { ...corsHeaders, "Content-Type": "application/json" } 
-  });
 });
 

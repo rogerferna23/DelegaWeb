@@ -99,29 +99,35 @@ export function AuthProvider({ children }) {
   }, [applySession]);
 
   const login = async (email, password) => {
+    console.log("[Auth] Intentando iniciar sesión para:", email);
     try {
-      // Invocación a la Edge Function de Seguridad con Timeout (Fase 3.1)
-      // Usamos un controlador de aborto para no dejar al usuario esperando indefinidamente
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 segundos de margen
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 12000)
+      );
 
-      const { data, error } = await supabase.functions.invoke('auth-login-limiter', {
-        body: { email, password },
-        headers: { 'Content-Type': 'application/json' }
-      }).catch(err => {
-        if (err.name === 'AbortError') throw new Error('TIMEOUT_ERROR');
-        throw err;
+      console.log("[Auth] Llamando a Edge Function 'auth-login-limiter'...");
+      const { data, error } = await Promise.race([
+        supabase.functions.invoke('auth-login-limiter', {
+          body: { email, password },
+          headers: { 'Content-Type': 'application/json' }
+        }),
+        timeoutPromise
+      ]).catch(err => {
+        console.error("[Auth] Error capturado en la carrera:", err.message);
+        if (err.message === 'TIMEOUT_ERROR') throw err;
+        throw new Error('NETWORK_ERROR');
       });
 
-      clearTimeout(timeoutId);
+      console.log("[Auth] Respuesta recibida:", { data, error });
 
       if (error || data?.error) {
-        const errorMessage = data?.error || error?.message || 'Error de conexión';
+        const errorMessage = data?.error || error?.message || 'Error de credenciales.';
         return { success: false, error: errorMessage };
       }
 
-      // Sincronizar sesión local
       const { session, user } = data;
+      if (!session) throw new Error('SESSION_MISSING');
+
       const { error: sessionError } = await supabase.auth.setSession(session);
       if (sessionError) throw sessionError;
 
@@ -131,11 +137,11 @@ export function AuthProvider({ children }) {
 
       return { success: true };
     } catch (err) {
-      console.error('Error crítico en login de seguridad:', err);
+      console.error('[Auth] Error crítico:', err);
       if (err.message === 'TIMEOUT_ERROR') {
-        return { success: false, error: 'El servidor de seguridad está tardando demasiado. Por favor, intenta de nuevo.' };
+        return { success: false, error: 'El servidor de seguridad no respondió a tiempo. Por favor, reintenta.' };
       }
-      return { success: false, error: 'No se pudo conectar con el servicio de seguridad. Verifica tu conexión.' };
+      return { success: false, error: 'Error de conexión. Verifica tu internet e intenta de nuevo.' };
     }
   };
 
