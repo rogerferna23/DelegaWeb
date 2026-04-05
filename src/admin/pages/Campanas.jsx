@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import { sanitize } from '../../utils/sanitize';
 import AIChatPanel from '../components/AIChatPanel';
 import RegistrarReunion from '../components/RegistrarReunion';
 
@@ -278,10 +279,10 @@ export default function Campanas() {
                         <span className="font-medium text-gray-300">{camp.estado}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 font-medium text-white">{camp.nombre}</td>
+                    <td className="px-4 py-2.5 font-medium text-white">{sanitize(camp.nombre)}</td>
                     <td className="px-4 py-2.5">
                       <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${camp.tipoColor}`}>
-                        {camp.tipo}
+                        {sanitize(camp.tipo)}
                       </span>
                     </td>
                     <td className="px-4 py-2.5 font-medium text-gray-300">{camp.presup}</td>

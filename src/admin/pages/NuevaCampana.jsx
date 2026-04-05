@@ -10,6 +10,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import GeneradorCopyAI from '../components/GeneradorCopyAI';
+import { getCsrfToken } from '../../utils/csrf';
+import { sanitize } from '../../utils/sanitize';
 
 export default function NuevaCampana() {
   const navigate = useNavigate();
@@ -276,9 +278,33 @@ Call to Action: ${formData.cta}
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
-  const savePlanned = () => {
-    // Simulación de guardado en base de datos con status PLANNED
-    navigate('/admin/campanas');
+  const savePlanned = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Debe iniciar sesión para guardar');
+
+      // Obtener token de seguridad de un solo uso
+      const token = await getCsrfToken();
+      if (!token) throw new Error('No se pudo validar la sesión de seguridad CSRF');
+
+      // Invocación a la Edge Function Blindada
+      const { data, error } = await supabase.functions.invoke('create-campaign-secure', {
+        body: { 
+          ...formData, 
+          status: 'planned'
+        },
+        headers: {
+          'X-CSRF-Token': token
+        }
+      });
+
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+
+      navigate('/admin/campanas');
+    } catch (err) {
+      console.error('Fallo en guardado seguro:', err);
+      alert(`Error de Seguridad: ${err.message}`);
+    }
   };
 
   const steps = [
@@ -636,9 +662,9 @@ Call to Action: ${formData.cta}
 
                 {/* Main Content Area */}
                 <div className="p-3 space-y-2">
-                  <p className="text-[11px] text-gray-200 line-clamp-3 leading-relaxed whitespace-pre-wrap">
-                    {formData.primary_text || 'Aquí se mostrará el cuerpo principal de tu anuncio...'}
-                  </p>
+                  <p className="text-[11px] text-gray-200 line-clamp-3 leading-relaxed whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: sanitize(formData.primary_text) || 'Aquí se mostrará el cuerpo principal de tu anuncio...' }}
+                  />
                 </div>
 
                 {/* Creative Placeholder */}
@@ -651,8 +677,12 @@ Call to Action: ${formData.cta}
                 <div className="bg-[#2a3a4d] p-3 flex justify-between items-center">
                   <div className="flex-1">
                     <p className="text-[9px] text-gray-400 uppercase font-bold truncate">FACEBOOK.COM</p>
-                    <p className="text-[11px] font-bold text-white leading-tight mt-0.5 line-clamp-1">{formData.headline || 'Título del anuncio'}</p>
-                    <p className="text-[10px] text-gray-300 line-clamp-1 mt-0.5">{formData.description || 'Descripción breve'}</p>
+                    <p className="text-[11px] font-bold text-white leading-tight mt-0.5 line-clamp-1"
+                      dangerouslySetInnerHTML={{ __html: sanitize(formData.headline) || 'Título del anuncio' }}
+                    />
+                    <p className="text-[10px] text-gray-300 line-clamp-1 mt-0.5"
+                      dangerouslySetInnerHTML={{ __html: sanitize(formData.description) || 'Descripción breve' }}
+                    />
                   </div>
                   <div className="bg-[#4b5a6d] border border-white/10 px-3 py-1 rounded text-[10px] font-bold text-white">
                     {formData.cta}

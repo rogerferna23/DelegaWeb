@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useNavigate, useParams } from 'react-router-dom';
+import { sanitize } from '../../utils/sanitize';
 
 const mockChartData = [
   { name: 'Lun', cpm: 2.1, clicks: 120 },
@@ -49,7 +50,7 @@ export default function DetalleCampana() {
           </button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-bold text-white mb-0.5">Tráfico frío - Emprendedores</h1>
+              <h1 className="text-xl font-bold text-white mb-0.5">{sanitize('Tráfico frío - Emprendedores')}</h1>
               <span className="bg-teal-500/10 border border-teal-500/20 text-teal-400 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 bg-teal-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(20,184,166,0.5)]"></div> 
                 Activa
@@ -173,7 +174,7 @@ export default function DetalleCampana() {
               <tbody className="divide-y divide-white/5">
                 {mockAdSets.map(as => (
                   <tr key={as.id} className="hover:bg-white/[0.01] transition-colors">
-                    <td className="px-5 py-3 font-bold text-gray-200">{as.name}</td>
+                    <td className="px-5 py-3 font-bold text-gray-200">{sanitize(as.name)}</td>
                     <td className="px-5 py-3 text-right text-gray-300 font-mono">{as.spend}</td>
                     <td className="px-5 py-3 text-right text-gray-300 font-mono">{as.messages}</td>
                     <td className="px-5 py-3 text-right text-teal-400 font-mono font-bold">{as.cpm}</td>
@@ -206,7 +207,7 @@ export default function DetalleCampana() {
               <tbody className="divide-y divide-white/5">
                 {mockAds.map(ad => (
                   <tr key={ad.id} className="hover:bg-white/[0.01] transition-colors">
-                    <td className="px-5 py-3 font-bold text-gray-200">{ad.name}</td>
+                    <td className="px-5 py-3 font-bold text-gray-200">{sanitize(ad.name)}</td>
                     <td className="px-5 py-3 text-right text-primary font-mono font-bold">{ad.ctr}</td>
                     <td className="px-5 py-3 text-right text-gray-300 font-mono">{ad.spend}</td>
                     <td className="px-5 py-3 text-right text-gray-300 font-mono">{ad.messages}</td>

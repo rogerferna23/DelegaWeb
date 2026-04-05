@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { logAction } from '../lib/auditLog';
 
@@ -48,64 +48,83 @@ export function AuthProvider({ children }) {
     setPendingRequests((data || []).filter(r => r.status === 'pending'));
   };
 
-  const applySession = async (authUser) => {
-    if (!authUser) {
+  const applySession = useCallback(async (authUser) => {
+    try {
+      if (!authUser) {
+        setCurrentUser(null);
+        setUsers([]);
+        setPendingRequests([]);
+        return;
+      }
+      const p = await fetchProfile(authUser);
+      if (p) {
+        const user = { ...authUser, role: p.role, name: p.name };
+        setCurrentUser(user);
+        fetchAllProfiles();
+        fetchAllRequests();
+      } else {
+        setCurrentUser(null);
+      }
+    } catch (err) {
+      console.error("Error al aplicar sesión:", err);
       setCurrentUser(null);
-      setUsers([]);
-      setPendingRequests([]);
-      return;
+    } finally {
+      setLoading(false);
     }
-    const p = await fetchProfile(authUser);
-    if (p) {
-      const user = { ...authUser, role: p.role, name: p.name };
-      setCurrentUser(user);
-      fetchAllProfiles();
-      fetchAllRequests();
-    } else {
-      setCurrentUser(null);
-    }
-  };
+  }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        applySession(session.user).finally(() => setLoading(false));
-      } else {
+    const initSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) await applySession(session.user);
+        else setLoading(false);
+      } catch (err) {
+        console.error("Error al inicializar sesión:", err);
+        setLoading(false);
+      }
+    };
+
+    initSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) await applySession(session.user);
+      else {
+        setCurrentUser(null);
         setLoading(false);
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
-        setCurrentUser(null);
-        setUsers([]);
-        setPendingRequests([]);
-      }
-    });
-
     return () => subscription.unsubscribe();
-  }, []);
+  }, [applySession]);
 
   const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      // Log failed attempt (no user context yet)
-      try {
-        await supabase.from('audit_log').insert({
-          user_email: email,
-          action: 'login_failed',
-          details: 'Credenciales incorrectas',
-        });
-      } catch (_) {}
-      return { success: false, error: 'Credenciales incorrectas' };
+    try {
+      // Invocación a la Edge Function de Seguridad (Fase 3.1)
+      // Esta función maneja Rate Limiting (Redis) y Auditoría Server-side
+      const { data, error } = await supabase.functions.invoke('auth-login-limiter', {
+        body: { email, password }
+      });
+
+      if (error || data?.error) {
+        const errorMessage = data?.error || error?.message || 'Error de conexión';
+        return { success: false, error: errorMessage };
+      }
+
+      // Sincronizar sesión local con la validada por el servidor
+      const { session, user } = data;
+      const { error: sessionError } = await supabase.auth.setSession(session);
+      if (sessionError) throw sessionError;
+
+      setTimeout(async () => {
+        await applySession(user);
+      }, 0);
+
+      return { success: true };
+    } catch (err) {
+      console.error('Error crítico en login de seguridad:', err);
+      return { success: false, error: 'El sistema de seguridad bloqueó la conexión. Intente más tarde.' };
     }
-
-    setTimeout(async () => {
-      await applySession(data.user);
-      logAction({ id: data.user.id, email: data.user.email }, 'login_success', 'Inicio de sesión exitoso');
-    }, 0);
-
-    return { success: true };
   };
 
   const logout = async () => {
@@ -212,6 +231,7 @@ export function AuthProvider({ children }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside AuthProvider');

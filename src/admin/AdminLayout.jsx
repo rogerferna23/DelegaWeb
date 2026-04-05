@@ -9,6 +9,8 @@ import {
   CheckCircle, XCircle, UserPlus, UserMinus, Inbox, Receipt, FileSpreadsheet, Palette,
 } from 'lucide-react';
 
+import SecurityBanner from './components/SecurityBanner';
+
 const navItems = [
   { label: 'Dashboard',     icon: LayoutDashboard, path: '/admin' },
   { label: 'Transacciones', icon: FileSpreadsheet, path: '/admin/transacciones' },
@@ -29,6 +31,13 @@ export default function AdminLayout() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [processing, setProcessing] = useState(null);
   const notifRef = useRef(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  // Update clock every minute for pure timeAgo and live updates
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -42,7 +51,7 @@ export default function AdminLayout() {
   // Refresh requests when panel opens
   useEffect(() => {
     if (notifOpen) fetchAllRequests();
-  }, [notifOpen]);
+  }, [notifOpen, fetchAllRequests]);
 
   const handleLogout = async () => {
     await logout();
@@ -65,7 +74,8 @@ export default function AdminLayout() {
   const resolvedRequests = (allRequests || []).filter(r => r.status !== 'pending').slice(0, 5);
 
   function timeAgo(dateStr) {
-    const diff = Date.now() - new Date(dateStr).getTime();
+    const timestamp = new Date(dateStr).getTime();
+    const diff = now - timestamp;
     const m = Math.floor(diff / 60000);
     const h = Math.floor(diff / 3600000);
     const d = Math.floor(diff / 86400000);
@@ -90,6 +100,7 @@ export default function AdminLayout() {
 
   return (
     <div className="w-screen h-screen bg-background text-white flex overflow-hidden">
+      <SecurityBanner />
       {/* ── Inactivity Warning Modal ── */}
       {showWarning && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
@@ -137,21 +148,28 @@ export default function AdminLayout() {
         </div>
 
         <nav className="flex-1 py-2 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
-          {allNavItems.map(({ label, icon: Icon, path, badge, badgeAlert }) => (
-            <NavLink
-              key={path}
-              to={path}
-              end={path === '/admin'}
-              title={collapsed ? label : undefined}
-              className={({ isActive }) =>
-                `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all duration-200 relative ${
-                  isActive
-                    ? 'bg-primary text-white shadow-md shadow-primary/20'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                }`
-              }
-            >
-              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+          {allNavItems.map((item) => {
+            const { label, icon: NavIcon, path, badge, badgeAlert } = item;
+            // Verificación defensiva del componente de icono
+            const ActualIcon = (typeof NavIcon === 'function' || (typeof NavIcon === 'object' && NavIcon !== null)) 
+              ? NavIcon 
+              : Shield;
+
+            return (
+              <NavLink
+                key={path}
+                to={path}
+                end={path === '/admin'}
+                title={collapsed ? label : undefined}
+                className={({ isActive }) =>
+                  `flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-all duration-200 relative ${
+                    isActive
+                      ? 'bg-primary text-white shadow-md shadow-primary/20'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`
+                }
+              >
+                <ActualIcon className="w-3.5 h-3.5 flex-shrink-0" />
               <span className={`flex-1 whitespace-nowrap transition-all duration-300 ${
                 collapsed ? 'w-0 opacity-0 overflow-hidden' : 'opacity-100'
               }`}>
@@ -170,7 +188,8 @@ export default function AdminLayout() {
                 }`} />
               )}
             </NavLink>
-          ))}
+          );
+        })}
         </nav>
 
         <div className="border-t border-white/5 py-2 px-2 space-y-0.5 flex-shrink-0">

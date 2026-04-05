@@ -45,6 +45,7 @@ const Creativos = lazy(() => import('./admin/pages/Creativos'))
 // Protected Route and Context (Keep static as they are small auth/logic wrappers)
 import ProtectedRoute from './admin/ProtectedRoute'
 import { AdminDataProvider } from './admin/AdminDataContext'
+import { useInactivityLogout } from './hooks/useInactivityLogout'
 
 function PublicSite() {
   return (
@@ -70,6 +71,7 @@ const PageLoader = () => (
 )
 
 function App() {
+  useInactivityLogout();
   return (
     <>
       <ScrollToTop />

@@ -5,6 +5,7 @@ import {
 import { DollarSign, TrendingUp, Package, Users } from 'lucide-react';
 import { useAdminVentas, useAdminVendors } from '../AdminDataContext';
 import { SERVICES_CATALOG } from '../../constants/services';
+import { sanitize } from '../../utils/sanitize';
 
 const MONTHS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
@@ -136,15 +137,15 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
-        {statCards.map(({ label, value, change, icon: Icon, positive }) => (
+        {statCards.map(({ label, value, change, icon: IconComponent, positive, color }) => (
           <div
             key={label}
             className="bg-cardbg border border-white/5 rounded-xl p-4 flex flex-col gap-3 hover:border-white/10 transition-colors"
           >
             <div className="flex items-start justify-between">
               <p className="text-gray-400 text-xs">{label}</p>
-              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Icon className="w-3.5 h-3.5 text-primary" />
+              <div className="p-3 rounded-lg bg-background border border-white/5 shadow-inner">
+                <IconComponent className={`w-5 h-5 ${color}`} />
               </div>
             </div>
             <div>
@@ -203,7 +204,9 @@ export default function Dashboard() {
                   {rank}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-white font-medium truncate">{name}</p>
+                  <p className="text-xs text-white font-medium truncate"
+                    dangerouslySetInnerHTML={{ __html: sanitize(name || 'Sin nombre') }}
+                  />
                   <p className="text-[10px] text-gray-500">{sales} ventas</p>
                 </div>
                 <div className="text-right flex-shrink-0">
