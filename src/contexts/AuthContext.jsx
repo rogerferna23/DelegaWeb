@@ -100,18 +100,27 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      // Invocación a la Edge Function de Seguridad (Fase 3.1)
-      // Esta función maneja Rate Limiting (Redis) y Auditoría Server-side
+      // Invocación a la Edge Function de Seguridad con Timeout (Fase 3.1)
+      // Usamos un controlador de aborto para no dejar al usuario esperando indefinidamente
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12 segundos de margen
+
       const { data, error } = await supabase.functions.invoke('auth-login-limiter', {
-        body: { email, password }
+        body: { email, password },
+        headers: { 'Content-Type': 'application/json' }
+      }).catch(err => {
+        if (err.name === 'AbortError') throw new Error('TIMEOUT_ERROR');
+        throw err;
       });
+
+      clearTimeout(timeoutId);
 
       if (error || data?.error) {
         const errorMessage = data?.error || error?.message || 'Error de conexión';
         return { success: false, error: errorMessage };
       }
 
-      // Sincronizar sesión local con la validada por el servidor
+      // Sincronizar sesión local
       const { session, user } = data;
       const { error: sessionError } = await supabase.auth.setSession(session);
       if (sessionError) throw sessionError;
@@ -123,7 +132,10 @@ export function AuthProvider({ children }) {
       return { success: true };
     } catch (err) {
       console.error('Error crítico en login de seguridad:', err);
-      return { success: false, error: 'El sistema de seguridad bloqueó la conexión. Intente más tarde.' };
+      if (err.message === 'TIMEOUT_ERROR') {
+        return { success: false, error: 'El servidor de seguridad está tardando demasiado. Por favor, intenta de nuevo.' };
+      }
+      return { success: false, error: 'No se pudo conectar con el servicio de seguridad. Verifica tu conexión.' };
     }
   };
 

@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
 
-const CookiePolicy = () => {
+const LegalCookiePolicy = () => {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -70,4 +70,4 @@ const CookiePolicy = () => {
   );
 };
 
-export default CookiePolicy;
+export default LegalCookiePolicy;

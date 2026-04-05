@@ -10,12 +10,12 @@ import Process from './components/Process'
 import Testimonials from './components/Testimonials'
 import CTA from './components/CTA'
 import Footer from './components/Footer'
-import CookieConsent from './components/CookieConsent'
+import LegalConsent from './components/LegalConsent'
 import ScrollToTop from './components/ScrollToTop'
 import './App.css'
 
 // Lazy load secondary public pages
-const CookiePolicy = lazy(() => import('./components/CookiePolicy'))
+const LegalCookiePolicy = lazy(() => import('./components/LegalCookiePolicy'))
 const PrivacyPolicy = lazy(() => import('./components/PrivacyPolicy'))
 const Disclaimer = lazy(() => import('./components/Disclaimer'))
 const TermsAndConditions = lazy(() => import('./components/TermsAndConditions'))
@@ -83,7 +83,7 @@ function App() {
             element={
               <>
                 <PublicSite />
-                <CookieConsent />
+                <LegalConsent />
               </>
             }
           />
@@ -91,8 +91,8 @@ function App() {
             path="/politica-de-cookies"
             element={
               <>
-                <CookiePolicy />
-                <CookieConsent />
+                <LegalCookiePolicy />
+                <LegalConsent />
               </>
             }
           />
@@ -101,7 +101,7 @@ function App() {
             element={
               <>
                 <PrivacyPolicy />
-                <CookieConsent />
+                <LegalConsent />
               </>
             }
           />
@@ -110,7 +110,7 @@ function App() {
             element={
               <>
                 <Disclaimer />
-                <CookieConsent />
+                <LegalConsent />
               </>
             }
           />
@@ -119,7 +119,7 @@ function App() {
             element={
               <>
                 <TermsAndConditions />
-                <CookieConsent />
+                <LegalConsent />
               </>
             }
           />
@@ -128,7 +128,7 @@ function App() {
             element={
               <>
                 <Copyright />
-                <CookieConsent />
+                <LegalConsent />
               </>
             }
           />
@@ -137,7 +137,7 @@ function App() {
             element={
               <>
                 <RefundPolicy />
-                <CookieConsent />
+                <LegalConsent />
               </>
             }
           />
@@ -146,7 +146,7 @@ function App() {
             element={
               <>
                 <CloserProgram />
-                <CookieConsent />
+                <LegalConsent />
               </>
             }
           />
@@ -155,7 +155,7 @@ function App() {
             element={
               <>
                 <PrivateBooking />
-                <CookieConsent />
+                <LegalConsent />
               </>
             }
           />

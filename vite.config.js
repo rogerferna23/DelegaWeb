@@ -16,11 +16,11 @@ export default defineConfig({
     headers: {
       'Content-Security-Policy': [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.paypal.com https://*.paypalobjects.com https://assets.calendly.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.paypal.com https://*.paypalobjects.com https://assets.calendly.com https://*.supabase.co",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.paypal.com",
         "font-src 'self' https://fonts.gstatic.com https://*.paypalobjects.com",
-        "img-src 'self' data: blob: https://*.paypal.com https://*.paypalobjects.com",
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paypal.com https://www.sandbox.paypal.com https://*.braintree-api.com ws: wss:",
+        "img-src 'self' data: blob: https://*.paypal.com https://*.paypalobjects.com https://*.supabase.co",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.paypal.com https://www.sandbox.paypal.com https://*.braintree-api.com ws: wss: http://localhost:* http://127.0.0.1:*",
         "frame-src https://*.paypal.com https://calendly.com",
         "frame-ancestors 'none'",
         "object-src 'none'",
