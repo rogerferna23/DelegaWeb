@@ -133,7 +133,12 @@ export function AuthProvider({ children }) {
       return { success: true };
     } catch (err) {
       if (err.message === 'TIMEOUT_ERROR') {
-        return { success: false, error: 'El servidor de seguridad no respondió a tiempo. Por favor, reintenta.' };
+        // Auto-heal: Limpiar tokens corruptos de Supabase en caso de bloqueo de LocalStorage
+        try {
+          const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('sb-'));
+          keysToRemove.forEach(k => localStorage.removeItem(k));
+        } catch(e) {}
+        return { success: false, error: 'El servidor se bloqueó pero hemos limpiado la caché por ti. Por favor, dale clic a "Ingresar" de nuevo.' };
       }
       return { success: false, error: 'Error de conexión con el servidor de autenticación.' };
     }
