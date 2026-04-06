@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Package, Users, BarChart3, Megaphone,
   Settings, Bell, Search, LogOut, Shield, PanelLeftClose,
   PanelLeftOpen, ClipboardList, FileText, Clock, RefreshCw,
-  CheckCircle, XCircle, UserPlus, UserMinus, Inbox, Receipt, FileSpreadsheet, Palette,
+  CheckCircle, XCircle, UserPlus, UserMinus, Inbox, Receipt, FileSpreadsheet, Palette, Sparkles
 } from 'lucide-react';
 
 import SecurityBanner from './components/SecurityBanner';
@@ -19,7 +19,8 @@ const navItems = [
   { label: 'Reportes',      icon: BarChart3,       path: '/admin/reportes' },
   { label: 'Postulantes',   icon: UserPlus,        path: '/admin/postulantes' },
   { label: 'Campañas',      icon: Megaphone,       path: '/admin/campanas', badge: 'Pronto' },
-  { label: 'Creativos',      icon: Palette,         path: '/admin/creativos' },
+  { label: 'Guiones IA',    icon: Sparkles,        path: '/admin/guiones-ia', badge: 'Nuevo' },
+  { label: 'Creativos',     icon: Palette,         path: '/admin/creativos' },
 ];
 
 export default function AdminLayout() {

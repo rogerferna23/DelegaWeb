@@ -100,10 +100,21 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      console.log('Iniciando direct signInWithPassword...');
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 8000)
+      );
+
+      const { data, error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        timeoutPromise
+      ]).catch(err => {
+        if (err.message === 'TIMEOUT_ERROR') throw err;
+        throw new Error('NETWORK_ERROR');
       });
+
+      console.log('signInWithPassword terminado', { error, userId: data?.user?.id });
 
       if (error) {
         return { success: false, error: 'Credenciales inválidas.' };
@@ -112,13 +123,19 @@ export function AuthProvider({ children }) {
       const { user } = data;
       if (!user) throw new Error('SESSION_MISSING');
 
-      // Iniciar sesión
-      setTimeout(async () => {
-        await applySession(user);
-      }, 0);
+      // Iniciar sesión y esperar a que el estado esté listo
+      await applySession(user);
 
       return { success: true };
     } catch (err) {
+      console.error('Error en login:', err.message);
+      if (err.message === 'TIMEOUT_ERROR') {
+        try {
+          const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('sb-'));
+          keysToRemove.forEach(k => localStorage.removeItem(k));
+        } catch(e) {}
+        return { success: false, error: 'La conexión de Supabase se bloqueó. Hemos limpiado la caché, por favor dale a "Ingresar" de nuevo.' };
+      }
       return { success: false, error: 'Error de conexión directa con Supabase.' };
     }
   };
