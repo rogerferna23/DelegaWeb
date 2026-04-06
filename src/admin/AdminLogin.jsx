@@ -41,12 +41,7 @@ export default function AdminLogin() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      {/* Marcador Visual de Depuración */}
-      <div className="fixed top-2 right-2 px-2 py-1 bg-red-600 text-white text-[10px] rounded font-bold z-50">
-        DEBUG: V2 (CODE RELOADED)
-      </div>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl" />
       </div>
 
       {/* Back to web button */}
