@@ -99,38 +99,43 @@ export function AuthProvider({ children }) {
   }, [applySession]);
 
   const login = async (email, password) => {
-    console.log("[Auth] 1. Iniciando login directo para:", email);
     try {
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 12000)
       );
 
-      console.log("[Auth] 2. Llamando a supabase.auth.signInWithPassword...");
       const { data, error } = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
+        supabase.functions.invoke('auth-login-limiter', {
+          body: { email, password },
+          headers: { 'Content-Type': 'application/json' }
+        }),
         timeoutPromise
-      ]);
+      ]).catch(err => {
+        if (err.message === 'TIMEOUT_ERROR') throw err;
+        throw new Error('NETWORK_ERROR');
+      });
 
-      console.log("[Auth] 3. Respuesta recibida:", data, error);
-
-      if (error) {
-        return { success: false, error: 'Credenciales inválidas.' };
+      if (error || data?.error) {
+        const errorMessage = data?.error || error?.message || 'Error de credenciales.';
+        return { success: false, error: errorMessage };
       }
 
-      const { user } = data;
-      if (!user) throw new Error('SESSION_MISSING');
+      const { session, user } = data;
+      if (!session) throw new Error('SESSION_MISSING');
 
-      console.log("[Auth] 4. Llamando a applySession...");
-      await applySession(user);
-      console.log("[Auth] 5. applySession completado con éxito.");
+      const { error: sessionError } = await supabase.auth.setSession(session);
+      if (sessionError) throw sessionError;
+
+      setTimeout(async () => {
+        await applySession(user);
+      }, 0);
 
       return { success: true };
     } catch (err) {
-      console.error("[Auth] 6. Error capturado:", err);
       if (err.message === 'TIMEOUT_ERROR') {
-        return { success: false, error: 'El servidor tardó demasiado en responder (Timeout en signInWithPassword).' };
+        return { success: false, error: 'El servidor de seguridad no respondió a tiempo. Por favor, reintenta.' };
       }
-      return { success: false, error: 'Error de conexión directa con Supabase.' };
+      return { success: false, error: 'Error de conexión con el servidor de autenticación.' };
     }
   };
 

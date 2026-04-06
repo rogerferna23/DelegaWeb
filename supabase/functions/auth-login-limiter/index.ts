@@ -26,25 +26,27 @@ Deno.serve(async (req) => {
     const { email, password } = await req.json();
     const clientIP = req.headers.get("x-forwarded-for") || "unknown";
 
-    // 1. LIMITADOR (DESACTIVADO TEMPORALMENTE PARA ESTABILIDAD)
-    /*
+    // 1. LIMITADOR DE RITMO (Upstash Redis)
     try {
       const upstashUrl = Deno.env.get("UPSTASH_URL");
       const upstashToken = Deno.env.get("UPSTASH_TOKEN");
+      
       if (upstashUrl && upstashToken) {
         const controller = new AbortController();
-        const tid = setTimeout(() => controller.abort(), 1500);
+        const tid = setTimeout(() => controller.abort(), 1500); // Bypass si Redis tarda > 1.5s
+        
         const limitKey = `login_limit_${clientIP.replace(/:/g, '_')}`;
-        await fetch(`${upstashUrl}/incr/${limitKey}`, {
+        const response = await fetch(`${upstashUrl}/incr/${limitKey}`, {
           headers: { Authorization: `Bearer ${upstashToken}` },
           signal: controller.signal
         });
+        
         clearTimeout(tid);
+        // Opcional: Podrías procesar 'response' para bloquear por IP si supera X intentos
       }
     } catch (e) {
-      console.warn("[Limiter] Skipping:", e.message);
+      console.warn("[Limiter] Skipping due to error or timeout:", e.message);
     }
-    */
 
     // 2. AUTHENTICATION
     const supabaseAnon = createClient(
