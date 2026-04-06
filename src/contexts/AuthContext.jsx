@@ -99,12 +99,19 @@ export function AuthProvider({ children }) {
   }, [applySession]);
 
   const login = async (email, password) => {
+    console.log("[Auth] 1. Iniciando login directo para:", email);
     try {
-      // Bypass temporal: Llamada directa a Supabase Auth saltando la Edge Function
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 12000)
+      );
+
+      console.log("[Auth] 2. Llamando a supabase.auth.signInWithPassword...");
+      const { data, error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        timeoutPromise
+      ]);
+
+      console.log("[Auth] 3. Respuesta recibida:", data, error);
 
       if (error) {
         return { success: false, error: 'Credenciales inválidas.' };
@@ -113,13 +120,16 @@ export function AuthProvider({ children }) {
       const { user } = data;
       if (!user) throw new Error('SESSION_MISSING');
 
-      // Iniciar sesión
-      setTimeout(async () => {
-        await applySession(user);
-      }, 0);
+      console.log("[Auth] 4. Llamando a applySession...");
+      await applySession(user);
+      console.log("[Auth] 5. applySession completado con éxito.");
 
       return { success: true };
     } catch (err) {
+      console.error("[Auth] 6. Error capturado:", err);
+      if (err.message === 'TIMEOUT_ERROR') {
+        return { success: false, error: 'El servidor tardó demasiado en responder (Timeout en signInWithPassword).' };
+      }
       return { success: false, error: 'Error de conexión directa con Supabase.' };
     }
   };
