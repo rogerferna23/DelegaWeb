@@ -1,63 +1,51 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const allowedOrigins = ["https://delegaweb.com", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173"];
+const allowedOrigins = [
+  "https://delegaweb.com",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:5174"
+];
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
   const corsHeaders = {
-    "Access-Control-Allow-Origin": allowedOrigins.includes(origin || "") ? origin! : "https://delegaweb.com",
+    "Access-Control-Allow-Origin": allowedOrigins.includes(origin || "") ? origin! : allowedOrigins[0],
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-CSRF-Token",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Max-Age": "86400",
   };
 
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  
-  // CORS check on all other methods
-  if (origin && !allowedOrigins.includes(origin)) {
-    return new Response(JSON.stringify({ error: "Origin not allowed" }), { 
-      status: 403, 
-      headers: { ...corsHeaders, "Content-Type": "application/json" } 
-    });
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
-  const { email, password } = await req.json();
-  const clientIP = req.headers.get("x-forwarded-for") || "unknown";
-  const limitKey = `limits:login:${email}:${clientIP}`;
-
-  // Rate Limiting con timeout y degradación elegante
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 segundos max para Redis
+    const { email, password } = await req.json();
+    const clientIP = req.headers.get("x-forwarded-for") || "unknown";
 
-    const res = await fetch(
-      `${Deno.env.get("UPSTASH_URL")}/incr/${limitKey}`,
-      { 
-        headers: { Authorization: `Bearer ${Deno.env.get("UPSTASH_TOKEN")}` },
-        signal: controller.signal
+    // 1. LIMITADOR VOLANTE (REDIS) - Máximo 1.5 segundos de espera
+    try {
+      const upstashUrl = Deno.env.get("UPSTASH_URL");
+      const upstashToken = Deno.env.get("UPSTASH_TOKEN");
+
+      if (upstashUrl && upstashToken) {
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 1500);
+        
+        const limitKey = `login_limit_${clientIP.replace(/:/g, '_')}`;
+        await fetch(`${upstashUrl}/incr/${limitKey}`, {
+          headers: { Authorization: `Bearer ${upstashToken}` },
+          signal: controller.signal
+        });
+        clearTimeout(tid);
       }
-    );
-    clearTimeout(timeoutId);
-    
-    const { result: attempts } = await res.json();
-    if (attempts === 1) {
-      await fetch(
-        `${Deno.env.get("UPSTASH_URL")}/expire/${limitKey}/900`,
-        { headers: { Authorization: `Bearer ${Deno.env.get("UPSTASH_TOKEN")}` } }
-      );
+    } catch (e) {
+      console.warn("[Limiter] Saltado por timeout o error:", e.message);
     }
-    if (attempts > 5) {
-      return new Response(
-        JSON.stringify({ error: "Demasiados intentos. Espera 15 min." }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-  } catch (e) {
-    console.warn("Redis issue or timeout, skipping limiter:", e.message);
-  }
 
-  // Auth con cliente ANON
-  try {
+    // 2. AUTHENTICATION
     const supabaseAnon = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_ANON_KEY")!
@@ -65,44 +53,52 @@ serve(async (req) => {
 
     const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
 
-    // Logs asíncronos (No bloqueantes)
+    // 3. AUDIT LOG (Fondo)
     const supabaseService = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    supabaseService.from("activity_logs").insert({
-      user_id: data?.user?.id || null,
-      action: "login",
+    edge_log(supabaseService, {
+      user_id: data?.user?.id,
+      email,
       status: error ? "failed" : "success",
-      severity: error ? "WARN" : "INFO",
-      details: { email, ip: clientIP, user_agent: req.headers.get("user-agent") },
-      ip_address: clientIP
-    }).catch(e => console.error("Log error:", e.message));
+      ip: clientIP,
+      ua: req.headers.get("user-agent")
+    });
 
     if (error) {
-      return new Response(JSON.stringify({ error: error.message }), { 
-        status: 401, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
 
-    if (!data?.session) {
-      return new Response(JSON.stringify({ error: "Sesión no generada." }), { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      });
-    }
-
-    return new Response(JSON.stringify(data), { 
-      status: 200, 
-      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: "Error interno de seguridad: " + e.message }), { 
-      status: 500, 
-      headers: { ...corsHeaders, "Content-Type": "application/json" } 
+
+  } catch (error) {
+    console.error("[Fatal Error]", error.message);
+    return new Response(JSON.stringify({ error: "Error interno: " + error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   }
 });
 
+async function edge_log(client: any, { user_id, email, status, ip, ua }: any) {
+  try {
+    await client.from("activity_logs").insert({
+      user_id: user_id || null,
+      action: "login",
+      status,
+      severity: status === "success" ? "INFO" : "WARN",
+      details: { email, ip, user_agent: ua },
+      ip_address: ip
+    });
+  } catch (e) {
+    console.error("Log error ignored:", e.message);
+  }
+}
