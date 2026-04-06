@@ -99,13 +99,11 @@ export function AuthProvider({ children }) {
   }, [applySession]);
 
   const login = async (email, password) => {
-    console.log("[Auth] Intentando iniciar sesión para:", email);
     try {
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 12000)
       );
 
-      console.log("[Auth] Llamando a Edge Function 'auth-login-limiter'...");
       const { data, error } = await Promise.race([
         supabase.functions.invoke('auth-login-limiter', {
           body: { email, password },
@@ -113,12 +111,9 @@ export function AuthProvider({ children }) {
         }),
         timeoutPromise
       ]).catch(err => {
-        console.error("[Auth] Error capturado en la carrera:", err.message);
         if (err.message === 'TIMEOUT_ERROR') throw err;
         throw new Error('NETWORK_ERROR');
       });
-
-      console.log("[Auth] Respuesta recibida:", { data, error });
 
       if (error || data?.error) {
         const errorMessage = data?.error || error?.message || 'Error de credenciales.';
@@ -137,7 +132,6 @@ export function AuthProvider({ children }) {
 
       return { success: true };
     } catch (err) {
-      console.error('[Auth] Error crítico:', err);
       if (err.message === 'TIMEOUT_ERROR') {
         return { success: false, error: 'El servidor de seguridad no respondió a tiempo. Por favor, reintenta.' };
       }
