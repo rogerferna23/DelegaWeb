@@ -100,47 +100,26 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 12000)
-      );
-
-      const { data, error } = await Promise.race([
-        supabase.functions.invoke('auth-login-limiter', {
-          body: { email, password },
-          headers: { 'Content-Type': 'application/json' }
-        }),
-        timeoutPromise
-      ]).catch(err => {
-        if (err.message === 'TIMEOUT_ERROR') throw err;
-        throw new Error('NETWORK_ERROR');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
 
-      if (error || data?.error) {
-        const errorMessage = data?.error || error?.message || 'Error de credenciales.';
-        return { success: false, error: errorMessage };
+      if (error) {
+        return { success: false, error: 'Credenciales inválidas.' };
       }
 
-      const { session, user } = data;
-      if (!session) throw new Error('SESSION_MISSING');
+      const { user } = data;
+      if (!user) throw new Error('SESSION_MISSING');
 
-      const { error: sessionError } = await supabase.auth.setSession(session);
-      if (sessionError) throw sessionError;
-
+      // Iniciar sesión
       setTimeout(async () => {
         await applySession(user);
       }, 0);
 
       return { success: true };
     } catch (err) {
-      if (err.message === 'TIMEOUT_ERROR') {
-        // Auto-heal: Limpiar tokens corruptos de Supabase en caso de bloqueo de LocalStorage
-        try {
-          const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('sb-'));
-          keysToRemove.forEach(k => localStorage.removeItem(k));
-        } catch(e) {}
-        return { success: false, error: 'El servidor se bloqueó pero hemos limpiado la caché por ti. Por favor, dale clic a "Ingresar" de nuevo.' };
-      }
-      return { success: false, error: 'Error de conexión con el servidor de autenticación.' };
+      return { success: false, error: 'Error de conexión directa con Supabase.' };
     }
   };
 
