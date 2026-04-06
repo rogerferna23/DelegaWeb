@@ -26,15 +26,14 @@ Deno.serve(async (req) => {
     const { email, password } = await req.json();
     const clientIP = req.headers.get("x-forwarded-for") || "unknown";
 
-    // 1. LIMITADOR VOLANTE (REDIS) - Máximo 1.5 segundos de espera
+    // 1. LIMITADOR (DESACTIVADO TEMPORALMENTE PARA ESTABILIDAD)
+    /*
     try {
       const upstashUrl = Deno.env.get("UPSTASH_URL");
       const upstashToken = Deno.env.get("UPSTASH_TOKEN");
-
       if (upstashUrl && upstashToken) {
         const controller = new AbortController();
         const tid = setTimeout(() => controller.abort(), 1500);
-        
         const limitKey = `login_limit_${clientIP.replace(/:/g, '_')}`;
         await fetch(`${upstashUrl}/incr/${limitKey}`, {
           headers: { Authorization: `Bearer ${upstashToken}` },
@@ -43,8 +42,9 @@ Deno.serve(async (req) => {
         clearTimeout(tid);
       }
     } catch (e) {
-      console.warn("[Limiter] Saltado por timeout o error:", e.message);
+      console.warn("[Limiter] Skipping:", e.message);
     }
+    */
 
     // 2. AUTHENTICATION
     const supabaseAnon = createClient(
@@ -54,7 +54,7 @@ Deno.serve(async (req) => {
 
     const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
 
-    // 3. AUDIT LOG (Fondo)
+    // 3. AUDIT LOG (Asíncrono)
     const supabaseService = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
