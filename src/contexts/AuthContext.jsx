@@ -173,21 +173,30 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut();
   };
 
+  // ── MFA helper ────────────────────────────────────────────────────────────
+  // Wraps any promise with a timeout so a hanging Supabase call never freezes the UI
+  const withMFATimeout = (promise, ms = 10000) =>
+    Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('La operación tardó demasiado. Intenta de nuevo.')), ms)
+      ),
+    ]);
+
   // ── MFA Functions ─────────────────────────────────────────────────────────
 
   const verifyMFA = async (factorId, code) => {
     try {
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+      const { data: challengeData, error: challengeError } = await withMFATimeout(
+        supabase.auth.mfa.challenge({ factorId })
+      );
       if (challengeError) return { success: false, error: challengeError.message };
 
-      const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId,
-        challengeId: challengeData.id,
-        code,
-      });
+      const { error: verifyError } = await withMFATimeout(
+        supabase.auth.mfa.verify({ factorId, challengeId: challengeData.id, code })
+      );
       if (verifyError) return { success: false, error: verifyError.message };
 
-      // MFA verified — now fully apply the session
       const { data: { user } } = await supabase.auth.getUser();
       if (user) await applySession(user);
 
@@ -199,7 +208,9 @@ export function AuthProvider({ children }) {
 
   const enrollMFA = async () => {
     try {
-      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+      const { data, error } = await withMFATimeout(
+        supabase.auth.mfa.enroll({ factorType: 'totp' })
+      );
       if (error) return { success: false, error: error.message };
       return {
         success: true,
@@ -215,7 +226,9 @@ export function AuthProvider({ children }) {
 
   const unenrollMFA = async (factorId) => {
     try {
-      const { error } = await supabase.auth.mfa.unenroll({ factorId });
+      const { error } = await withMFATimeout(
+        supabase.auth.mfa.unenroll({ factorId })
+      );
       if (error) return { success: false, error: error.message };
       return { success: true };
     } catch (err) {
@@ -225,9 +238,12 @@ export function AuthProvider({ children }) {
 
   const getMFAFactors = async () => {
     try {
-      const { data, error } = await supabase.auth.mfa.listFactors();
+      const { data, error } = await withMFATimeout(
+        supabase.auth.mfa.listFactors()
+      );
       if (error) return { success: false, factors: [] };
       return { success: true, factors: data?.totp || [] };
+
     } catch {
       return { success: false, factors: [] };
     }
