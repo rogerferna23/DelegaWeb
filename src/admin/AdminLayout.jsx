@@ -21,6 +21,7 @@ const navItems = [
   { label: 'Campañas',      icon: Megaphone,       path: '/admin/campanas', badge: 'Pronto' },
   { label: 'Guiones IA',    icon: Sparkles,        path: '/admin/guiones-ia', badge: 'Nuevo' },
   { label: 'Creativos',     icon: Palette,         path: '/admin/creativos' },
+  { label: 'Seguridad',     icon: Shield,          path: '/admin/seguridad' },
 ];
 
 export default function AdminLayout() {

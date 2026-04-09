@@ -42,6 +42,7 @@ const AdminRequests = lazy(() => import('./admin/pages/AdminRequests'))
 const Postulantes = lazy(() => import('./admin/pages/Postulantes'))
 const Creativos = lazy(() => import('./admin/pages/Creativos'))
 const GuionesIA = lazy(() => import('./admin/pages/GuionesIA'))
+const Seguridad = lazy(() => import('./admin/pages/Seguridad'))
 
 // Protected Route and Context (Keep static as they are small auth/logic wrappers)
 import ProtectedRoute from './admin/ProtectedRoute'
@@ -188,6 +189,7 @@ function App() {
             <Route path="campanas/nueva" element={<NuevaCampana />} />
             <Route path="campanas/:id" element={<DetalleCampana />} />
             <Route path="solicitudes" element={<AdminRequests />} />
+            <Route path="seguridad" element={<Seguridad />} />
             <Route
               path="auditoria"
               element={

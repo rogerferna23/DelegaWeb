@@ -103,7 +103,7 @@ export function AuthProvider({ children }) {
       console.log('Iniciando direct signInWithPassword...');
       
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 8000)
+        setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 25000)
       );
 
       const { data, error } = await Promise.race([
@@ -123,9 +123,21 @@ export function AuthProvider({ children }) {
       const { user } = data;
       if (!user) throw new Error('SESSION_MISSING');
 
-      // Iniciar sesión y esperar a que el estado esté listo
-      await applySession(user);
+      // Check if MFA is required (AAL1 session but user has TOTP factors)
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (
+        aalData?.nextLevel === 'aal2' &&
+        aalData?.currentLevel === 'aal1'
+      ) {
+        // Don't apply session yet — user must verify MFA first
+        const { data: factorsData } = await supabase.auth.mfa.listFactors();
+        const totpFactor = factorsData?.totp?.[0];
+        if (totpFactor) {
+          return { success: true, mfaRequired: true, factorId: totpFactor.id };
+        }
+      }
 
+      await applySession(user);
       return { success: true };
     } catch (err) {
       console.error('Error en login:', err.message);
@@ -133,8 +145,8 @@ export function AuthProvider({ children }) {
         try {
           const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('sb-'));
           keysToRemove.forEach(k => localStorage.removeItem(k));
-        } catch(e) {}
-        return { success: false, error: 'La conexión de Supabase se bloqueó. Hemos limpiado la caché, por favor dale a "Ingresar" de nuevo.' };
+        } catch { /* ignore localStorage errors */ }
+        return { success: false, error: 'La conexión tardó demasiado (Timeout). Hemos limpiado la caché, intenta nuevamente conectarte a una red estable.' };
       }
       return { success: false, error: 'Error de conexión directa con Supabase.' };
     }
@@ -145,6 +157,66 @@ export function AuthProvider({ children }) {
       await logAction(currentUser, 'logout', 'Cierre de sesión');
     }
     await supabase.auth.signOut();
+  };
+
+  // ── MFA Functions ─────────────────────────────────────────────────────────
+
+  const verifyMFA = async (factorId, code) => {
+    try {
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
+      if (challengeError) return { success: false, error: challengeError.message };
+
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId: challengeData.id,
+        code,
+      });
+      if (verifyError) return { success: false, error: verifyError.message };
+
+      // MFA verified — now fully apply the session
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await applySession(user);
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const enrollMFA = async () => {
+    try {
+      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+      if (error) return { success: false, error: error.message };
+      return {
+        success: true,
+        factorId: data.id,
+        qrCode: data.totp.qr_code,
+        secret: data.totp.secret,
+        uri: data.totp.uri,
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const unenrollMFA = async (factorId) => {
+    try {
+      const { error } = await supabase.auth.mfa.unenroll({ factorId });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  };
+
+  const getMFAFactors = async () => {
+    try {
+      const { data, error } = await supabase.auth.mfa.listFactors();
+      if (error) return { success: false, factors: [] };
+      return { success: true, factors: data?.totp || [] };
+    } catch {
+      return { success: false, factors: [] };
+    }
   };
 
   const addAdmin = async ({ name, email, password, role = 'admin' }) => {
@@ -238,6 +310,7 @@ export function AuthProvider({ children }) {
       currentUser, users, pendingRequests, allRequests, loading,
       login, logout, addAdmin, removeAdmin,
       requestAdminAction, reviewRequest, fetchPendingRequests, fetchAllRequests,
+      verifyMFA, enrollMFA, unenrollMFA, getMFAFactors,
     }}>
       {children}
     </AuthContext.Provider>

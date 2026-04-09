@@ -1,3 +1,9 @@
+// SECURITY NOTE: xlsx tiene CVEs activas (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9)
+// que afectan únicamente a XLSX.read() y parsing de input externo.
+// Este archivo usa xlsx solo para escritura (write-only) con datos internos
+// de Supabase. No se procesa ningún archivo externo. Riesgo: no aplica.
+// Revisado: 2026-04-09. Pendiente: evaluar migración a exceljs si xlsx
+// recibe una CVE que afecte operaciones de escritura.
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 

@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "zod";
+import { loginSchema } from "../../src/schemas/auth.schema.ts";
 
 const allowedOrigins = [
   "https://delegaweb.com",
@@ -23,7 +25,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, password } = await req.json();
+    const body = await req.json();
+
+    // 0. ZOD INPUT VALIDATION
+    const parsed = loginSchema.safeParse(body);
+    if (!parsed.success) {
+      return new Response(
+        JSON.stringify({ error: 'Datos de entrada inválidos', details: parsed.error.flatten().fieldErrors }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { email, password } = parsed.data;
     const clientIP = req.headers.get("x-forwarded-for") || "unknown";
 
     // 1. LIMITADOR DE RITMO (Upstash Redis)

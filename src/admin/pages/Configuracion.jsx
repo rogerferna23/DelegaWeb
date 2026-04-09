@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { sanitizeText } from '../../lib/sanitize';
 import { Plus, Trash2, Shield, UserCheck, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
+import { addAdminSchema } from '../../schemas/auth.schema.ts';
 import ClaudeModelSelector from '../components/ClaudeModelSelector';
 
 const ROLE_LABELS = { superadmin: 'Super Admin', admin: 'Administrador' };
@@ -17,6 +18,7 @@ export default function Configuracion() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'admin' });
   const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   const showToast = (msg, type = 'success') => {
@@ -27,13 +29,27 @@ export default function Configuracion() {
   const handleAdd = async (e) => {
     e.preventDefault();
     setFormError('');
-    if (!form.name || !form.email || !form.password) { setFormError('Completa todos los campos'); return; }
-    if (form.password.length < 6) { setFormError('La contraseña debe tener al menos 6 caracteres'); return; }
+    setFieldErrors({});
+
+    // Zod validation
+    const parsed = addAdminSchema.safeParse(form);
+    if (!parsed.success) {
+      const flat = parsed.error.flatten().fieldErrors;
+      setFieldErrors({
+        name: flat.name?.[0],
+        email: flat.email?.[0],
+        password: flat.password?.[0],
+        role: flat.role?.[0],
+      });
+      return;
+    }
+
     setSubmitting(true);
     const result = await addAdmin({ ...form, name: sanitizeText(form.name) });
     setSubmitting(false);
     if (result.success) {
       setForm({ name: '', email: '', password: '', role: 'admin' });
+      setFieldErrors({});
       showToast('Administrador creado correctamente');
     } else {
       setFormError(result.error);
@@ -148,10 +164,15 @@ export default function Configuracion() {
                 <input
                   type={type}
                   value={form[key]}
-                  onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                  onChange={e => { setForm(f => ({ ...f, [key]: e.target.value })); setFieldErrors(fe => ({ ...fe, [key]: undefined })); }}
                   placeholder={placeholder}
-                  className="w-full bg-background border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/40 transition-all"
+                  className={`w-full bg-background border rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none transition-all ${
+                    fieldErrors[key] ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-primary/40'
+                  }`}
                 />
+                {fieldErrors[key] && (
+                  <p className="text-red-400 text-[10px] mt-0.5 ml-0.5">{fieldErrors[key]}</p>
+                )}
               </div>
             ))}
 
@@ -161,14 +182,19 @@ export default function Configuracion() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={form.password}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                  onChange={e => { setForm(f => ({ ...f, password: e.target.value })); setFieldErrors(fe => ({ ...fe, password: undefined })); }}
                   placeholder="Mín. 6 caracteres"
-                  className="w-full bg-background border border-white/10 rounded-lg px-3 pr-9 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/40 transition-all"
+                  className={`w-full bg-background border rounded-lg px-3 pr-9 py-2 text-xs text-white placeholder-gray-600 focus:outline-none transition-all ${
+                    fieldErrors.password ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-primary/40'
+                  }`}
                 />
                 <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
                   {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p className="text-red-400 text-[10px] mt-0.5 ml-0.5">{fieldErrors.password}</p>
+              )}
             </div>
 
             <div>
