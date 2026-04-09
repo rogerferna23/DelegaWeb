@@ -1,6 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from "zod";
-import { loginSchema } from "../../src/schemas/auth.schema.ts";
+
+// Inline schema — mirrors src/schemas/auth.schema.ts (keep in sync)
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
 
 const allowedOrigins = [
   "https://delegaweb.com",
