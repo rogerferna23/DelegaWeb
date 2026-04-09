@@ -123,15 +123,16 @@ export function AuthProvider({ children }) {
       const { user } = data;
       if (!user) throw new Error('SESSION_MISSING');
 
-      // Check if MFA is required (AAL1 session but user has TOTP factors)
+      // Check if MFA is required (AAL1 session but user has VERIFIED TOTP factors)
       const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (
         aalData?.nextLevel === 'aal2' &&
         aalData?.currentLevel === 'aal1'
       ) {
-        // Don't apply session yet — user must verify MFA first
         const { data: factorsData } = await supabase.auth.mfa.listFactors();
-        const totpFactor = factorsData?.totp?.[0];
+        // Only require MFA if there is at least one VERIFIED factor
+        // Unverified factors (cancelled enrollments) must NOT block login
+        const totpFactor = factorsData?.totp?.find(f => f.status === 'verified');
         if (totpFactor) {
           return { success: true, mfaRequired: true, factorId: totpFactor.id };
         }
