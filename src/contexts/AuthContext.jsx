@@ -123,20 +123,33 @@ export function AuthProvider({ children }) {
       const { user } = data;
       if (!user) throw new Error('SESSION_MISSING');
 
-      // Check if MFA is required (AAL1 session but user has VERIFIED TOTP factors)
-      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (
-        aalData?.nextLevel === 'aal2' &&
-        aalData?.currentLevel === 'aal1'
-      ) {
-        const { data: factorsData } = await supabase.auth.mfa.listFactors();
-        // Only require MFA if there is at least one VERIFIED factor
-        // Unverified factors (cancelled enrollments) must NOT block login
-        const totpFactor = factorsData?.totp?.find(f => f.status === 'verified');
-        if (totpFactor) {
-          return { success: true, mfaRequired: true, factorId: totpFactor.id };
+      // MFA check — wrapped in timeout + try/catch so a hanging Supabase call
+      // never blocks login. Fails OPEN: if the check hangs or errors, user gets in.
+      try {
+        const mfaCheckPromise = (async () => {
+          const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel === 'aal1') {
+            const { data: factorsData } = await supabase.auth.mfa.listFactors();
+            // Only VERIFIED factors require MFA — cancelled/unverified enrollments are ignored
+            const totpFactor = factorsData?.totp?.find(f => f.status === 'verified');
+            if (totpFactor) return { mfaRequired: true, factorId: totpFactor.id };
+          }
+          return { mfaRequired: false };
+        })();
+
+        const mfaResult = await Promise.race([
+          mfaCheckPromise,
+          new Promise(resolve => setTimeout(() => resolve({ mfaRequired: false }), 5000)),
+        ]);
+
+        if (mfaResult.mfaRequired) {
+          return { success: true, mfaRequired: true, factorId: mfaResult.factorId };
         }
+      } catch {
+        // MFA check failed — fail open, let the user in
+        console.warn('MFA check failed or timed out, proceeding without MFA.');
       }
+
 
       await applySession(user);
       return { success: true };

@@ -263,7 +263,17 @@ export default function MFASetup() {
         </button>
 
         <button
-          onClick={() => { setStage('idle'); setEnrollData(null); setOtpCode(''); setError(''); }}
+          onClick={async () => {
+            // Clean up the pending unverified factor before cancelling
+            // so it does not interfere with future logins
+            if (enrollData?.factorId) {
+              try { await unenrollMFA(enrollData.factorId); } catch { /* ignore */ }
+            }
+            setStage('idle');
+            setEnrollData(null);
+            setOtpCode('');
+            setError('');
+          }}
           className="w-full mt-2 text-[11px] text-gray-600 hover:text-gray-400 transition-colors"
         >
           Cancelar
