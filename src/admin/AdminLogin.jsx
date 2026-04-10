@@ -25,8 +25,11 @@ export default function AdminLogin() {
   const [mfaLoading, setMfaLoading] = useState(false);
 
   React.useEffect(() => {
-    if (currentUser) navigate(from, { replace: true });
-  }, [currentUser, navigate, from]);
+    // If MFA is required, don't auto-navigate even if currentUser exists (at aal1)
+    if (currentUser && !mfaStep) {
+      navigate(from, { replace: true });
+    }
+  }, [currentUser, mfaStep, navigate, from]);
 
   // ── Step 1: Credentials ──────────────────────────────────────────────────
 

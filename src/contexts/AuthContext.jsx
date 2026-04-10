@@ -87,9 +87,17 @@ export function AuthProvider({ children }) {
 
     initSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session) await applySession(session.user);
-      else {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        // Prevent auto-applying session if MFA is required (aal1 -> aal2 escalation needed).
+        // This ensures AdminLogin don't redirect before the second factor is entered.
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1' && event !== 'SIGNED_OUT') {
+          setLoading(false);
+          return;
+        }
+        await applySession(session.user);
+      } else {
         setCurrentUser(null);
         setLoading(false);
       }
@@ -127,33 +135,20 @@ export function AuthProvider({ children }) {
       // never blocks login. Fails OPEN: if the check hangs or errors, user gets in.
       try {
         const mfaCheckPromise = (async () => {
-          const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          console.log("MFA Debug - AAL Data:", aalData, "Error:", aalError);
+          const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
           if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel === 'aal1') {
-            const { data: factorsData, error: fError } = await supabase.auth.mfa.listFactors();
-            console.log("MFA Debug - Factors Data:", factorsData, "Error:", fError);
-
+            const { data: factorsData } = await supabase.auth.mfa.listFactors();
             // Only VERIFIED factors require MFA — cancelled/unverified enrollments are ignored
             const totpFactor = factorsData?.totp?.find(f => f.status === 'verified');
-            if (totpFactor) {
-              console.log("MFA Debug - Verified TOTP factor found:", totpFactor.id);
-              return { mfaRequired: true, factorId: totpFactor.id };
-            } else {
-              console.log("MFA Debug - No verified TOTP factor found in factorsData");
-            }
-          } else {
-            console.log("MFA Debug - AAL levels do not require additional verification. Current:", aalData?.currentLevel, "Next:", aalData?.nextLevel);
+            if (totpFactor) return { mfaRequired: true, factorId: totpFactor.id };
           }
           return { mfaRequired: false };
         })();
 
         const mfaResult = await Promise.race([
           mfaCheckPromise,
-          new Promise(resolve => setTimeout(() => {
-            console.warn("MFA check TIMEOUT reached (10s) - Fails OPEN");
-            resolve({ mfaRequired: false });
-          }, 10000)),
+          new Promise(resolve => setTimeout(() => resolve({ mfaRequired: false }), 10000)),
         ]);
 
         if (mfaResult.mfaRequired) {
