@@ -194,6 +194,13 @@ export function AuthProvider({ children }) {
 
   // ── MFA Functions ─────────────────────────────────────────────────────────
 
+  const verifyMFA = async (factorId, code) => {
+    try {
+      const { data: challengeData, error: challengeError } = await withMFATimeout(
+        supabase.auth.mfa.challenge({ factorId })
+      );
+      if (challengeError) return { success: false, error: challengeError.message };
+
       const { error: verifyError } = await supabase.auth.mfa.verify({ 
         factorId, 
         challengeId: challengeData.id, 
@@ -202,13 +209,10 @@ export function AuthProvider({ children }) {
       if (verifyError) return { success: false, error: verifyError.message };
 
       const { data: { user } } = await supabase.auth.getUser();
-      console.log("MFA Success! User escalated level:", user?.id);
-      
       if (user) await applySession(user);
 
       return { success: true };
     } catch (err) {
-      console.error("MFA Verify catch block:", err.message);
       return { success: false, error: err.message };
     }
   };
