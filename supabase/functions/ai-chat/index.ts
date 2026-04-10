@@ -20,17 +20,29 @@ serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error("Auth: No se recibió cabecera de Authorization");
+      throw new Error('No autorizado: Sin token');
+    }
+
     const { message, campaign_id, is_copy_generation } = await req.json();
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      { global: { headers: { Authorization: authHeader } } }
     );
     
-    // Autenticación de usuario
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('No autorizado');
+    // Autenticación de usuario con reintento o validación manual si es necesario
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("Auth: Error validando usuario:", authError?.message || "Usuario nulo");
+      throw new Error(`No autorizado: Sesión inválida (${authError?.message || 'NULL'})`);
+    }
+
+    console.log(`Auth: Usuario validado -> ${user.id}`);
 
     // 1. Obtener Historial (Últimos 20 Mensajes)
     const { data: historyData } = await supabase
