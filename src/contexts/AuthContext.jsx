@@ -127,19 +127,33 @@ export function AuthProvider({ children }) {
       // never blocks login. Fails OPEN: if the check hangs or errors, user gets in.
       try {
         const mfaCheckPromise = (async () => {
-          const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          console.log("MFA Debug - AAL Data:", aalData, "Error:", aalError);
+
           if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel === 'aal1') {
-            const { data: factorsData } = await supabase.auth.mfa.listFactors();
+            const { data: factorsData, error: fError } = await supabase.auth.mfa.listFactors();
+            console.log("MFA Debug - Factors Data:", factorsData, "Error:", fError);
+
             // Only VERIFIED factors require MFA — cancelled/unverified enrollments are ignored
             const totpFactor = factorsData?.totp?.find(f => f.status === 'verified');
-            if (totpFactor) return { mfaRequired: true, factorId: totpFactor.id };
+            if (totpFactor) {
+              console.log("MFA Debug - Verified TOTP factor found:", totpFactor.id);
+              return { mfaRequired: true, factorId: totpFactor.id };
+            } else {
+              console.log("MFA Debug - No verified TOTP factor found in factorsData");
+            }
+          } else {
+            console.log("MFA Debug - AAL levels do not require additional verification. Current:", aalData?.currentLevel, "Next:", aalData?.nextLevel);
           }
           return { mfaRequired: false };
         })();
 
         const mfaResult = await Promise.race([
           mfaCheckPromise,
-          new Promise(resolve => setTimeout(() => resolve({ mfaRequired: false }), 5000)),
+          new Promise(resolve => setTimeout(() => {
+            console.warn("MFA check TIMEOUT reached (10s) - Fails OPEN");
+            resolve({ mfaRequired: false });
+          }, 10000)),
         ]);
 
         if (mfaResult.mfaRequired) {
