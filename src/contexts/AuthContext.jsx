@@ -206,11 +206,14 @@ export function AuthProvider({ children }) {
       if (challengeError) return { success: false, error: challengeError.message };
 
       console.log("MFA Verify starting with code...");
+      const startTime = Date.now();
       const { error: verifyError } = await withMFATimeout(
-        supabase.auth.mfa.verify({ factorId, challengeId: challengeData.id, code })
+        supabase.auth.mfa.verify({ factorId, challengeId: challengeData.id, code }),
+        30000 // 30 seconds for verification
       );
+      const duration = Date.now() - startTime;
       
-      console.log("MFA Verify result - Error:", verifyError);
+      console.log(`MFA Verify result after ${duration}ms - Error:`, verifyError);
       if (verifyError) return { success: false, error: verifyError.message };
 
       const { data: { user } } = await supabase.auth.getUser();
