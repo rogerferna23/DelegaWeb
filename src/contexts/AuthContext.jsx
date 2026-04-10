@@ -205,15 +205,19 @@ export function AuthProvider({ children }) {
       console.log("MFA Challenge result:", challengeData, "Error:", challengeError);
       if (challengeError) return { success: false, error: challengeError.message };
 
-      console.log("MFA Verify starting with code...");
+      console.log("MFA Verify starting (raw call, no local timeout)...");
       const startTime = Date.now();
-      const { error: verifyError } = await withMFATimeout(
-        supabase.auth.mfa.verify({ factorId, challengeId: challengeData.id, code }),
-        30000 // 30 seconds for verification
-      );
-      const duration = Date.now() - startTime;
       
-      console.log(`MFA Verify result after ${duration}ms - Error:`, verifyError);
+      // We remove withMFATimeout here to see if Supabase eventually 
+      // returns an error or if the browser blocks the request.
+      const { error: verifyError } = await supabase.auth.mfa.verify({ 
+        factorId, 
+        challengeId: challengeData.id, 
+        code 
+      });
+      
+      const duration = Date.now() - startTime;
+      console.log(`MFA Verify completed in ${duration}ms. Error:`, verifyError);
       if (verifyError) return { success: false, error: verifyError.message };
 
       const { data: { user } } = await supabase.auth.getUser();
