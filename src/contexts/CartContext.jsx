@@ -8,13 +8,13 @@ export function useCart() {
 
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState(() => {
-    const saved = localStorage.getItem('delegaweb_cart');
+    const saved = sessionStorage.getItem('delegaweb_cart');
     return saved ? JSON.parse(saved) : [];
   });
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('delegaweb_cart', JSON.stringify(cartItems));
+    sessionStorage.setItem('delegaweb_cart', JSON.stringify(cartItems));
   }, [cartItems]);
 
   const addToCart = (product) => {
