@@ -12,7 +12,7 @@ const customStorage = {
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
-    storage: customStorage,
+    // We remove customStorage to use the default localStorage and avoid potential deadlocks
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
