@@ -39,13 +39,24 @@ const MODELS = [
   {
     id: 'gpt-5-4',
     name: 'ChatGPT 5.4',
-    speed: '⚡ Instantáneo',
-    useCase: 'Multimodal, versátil y razonamiento avanzado',
+    speed: '⚡ 1-2s',
+    useCase: 'Razonamiento avanzado y estrategia compleja',
     cost: '💰💰 Premium',
     icon: Sparkles,
     color: 'text-green-400',
     bgColor: 'bg-green-400/10',
     borderColor: 'border-green-400/20'
+  },
+  {
+    id: 'gpt-5-4-mini',
+    name: 'ChatGPT 5.4 mini',
+    speed: '⚡ Instantáneo',
+    useCase: 'Tareas rápidas y generación de copy eficiente',
+    cost: '💴 Económico',
+    icon: Zap,
+    color: 'text-teal-400',
+    bgColor: 'bg-teal-400/10',
+    borderColor: 'border-teal-400/20'
   }
 ];
 

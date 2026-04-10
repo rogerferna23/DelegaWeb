@@ -61,7 +61,10 @@ export default function MFASetup() {
   }, [getMFAFactors]);
 
   useEffect(() => {
-    if (currentUser) loadFactors();
+    if (currentUser) {
+      // Usamos una microtarea para evitar el aviso de setState síncrono en el effect
+      Promise.resolve().then(() => loadFactors());
+    }
   }, [currentUser, loadFactors]);
 
   // Guard: explicit check after all hooks

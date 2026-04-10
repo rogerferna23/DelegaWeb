@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { 
   ArrowRight, ArrowLeft, Target, Users, 
-  Image as ImageIcon, Rocket, ImagePlus, 
-  Sparkles, Copy, ExternalLink, Save, CheckCircle2,
-  Info, Briefcase, Building2, Globe, MessageSquare, 
-  ShoppingCart, Mail, PlusSquare, LayoutTemplate,
+  Image as ImageIcon, Rocket, 
+  Copy, ExternalLink, Save, CheckCircle2,
+  Briefcase, 
+  MessageSquare, ShoppingCart, Mail, PlusSquare,
   Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -12,11 +12,14 @@ import { supabase } from '../../lib/supabase';
 import GeneradorCopyAI from '../components/GeneradorCopyAI';
 import { getCsrfToken } from '../../utils/csrf';
 import { sanitize } from '../../utils/sanitize';
+import { buildCampaignPrompt } from '../components/campaigns/CampaignPromptBuilder';
 
 export default function NuevaCampana() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [isGuideGenerated, setIsGuideGenerated] = useState(false);
+  const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
+  const [implementationGuideText, setImplementationGuideText] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
   
   // States del formulario
@@ -228,58 +231,31 @@ export default function NuevaCampana() {
     }));
   };
 
-  const generateGuide = () => {
-    setIsGuideGenerated(true);
+  const generateGuide = async () => {
+    try {
+      setIsGeneratingGuide(true);
+      
+      const prompt = buildCampaignPrompt(formData);
+
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: { 
+          message: prompt,
+          is_copy_generation: false 
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setImplementationGuideText(data.result || 'No se pudo generar la guía. Intenta de nuevo.');
+      setIsGuideGenerated(true);
+    } catch (err) {
+      console.error('Error generando guía:', err);
+      alert(`Error al generar la guía: ${err.message || 'Error de conexión'}`);
+    } finally {
+      setIsGeneratingGuide(false);
+    }
   };
-
-  const implementationGuideText = `
-═══════════════════════════════════════
-  GUÍA DE IMPLEMENTACIÓN - META ADS
-═══════════════════════════════════════
-
-📋 CONFIGURACIÓN BÁSICA
-────────────────────────
-Nombre: ${formData.name || 'Sin nombre'}
-Empresa: ${formData.company_name || 'Sin empresa'}
-Objetivo: ${formData.objective}
-Presupuesto diario: $${formData.daily_budget} USD
-Tipo: Tráfico Frío
-
-🎯 ESTRATEGIA DE NEGOCIO
-────────────────────────
-Oferta: ${formData.offer}
-Cliente Ideal: ${formData.ideal_client}
-Método de Cierre: ${formData.sales_method}
-
-🎯 AUDIENCIA
-────────────────────────
-Ubicaciones: ${formData.locations.join(', ') || 'Global'}
-Edad: ${formData.audience_age_min} - ${formData.audience_age_max} años
-Género: ${formData.gender}
-Intereses: ${formData.interests.length > 0 ? formData.interests.join(', ') : 'Amplia (sin intereses específicos)'}
-
-✍️ COPY DEL ANUNCIO
-────────────────────────
-Texto principal:
-${formData.primary_text || '(Sin texto principal)'}
-
-Título: ${formData.headline || '(Sin título)'}
-Descripción: ${formData.description || '(Sin descripción)'}
-Call to Action: ${formData.cta}
-
-📌 PASOS PARA MONTAR EN META ADS MANAGER
-─────────────────────────────────────────
-1. Abre adsmanager.facebook.com
-2. Haz clic en "+ Crear"
-3. Selecciona el objetivo "${formData.objective}"
-4. Nombra la campaña: "${formData.name || 'Nueva Campaña'}"
-5. Configura el presupuesto diario: $${formData.daily_budget}
-6. En Audiencia, configura ubicación, edad, género e intereses según los datos arriba
-7. Sube tu creativo (imagen o video) directamente en Meta
-8. Pega el texto principal, título y descripción
-9. Selecciona el botón de CTA: "${formData.cta}"
-10. Revisa todo y publica
-  `;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(implementationGuideText);
@@ -785,10 +761,20 @@ Call to Action: ${formData.cta}
                  </p>
                  <button 
                    onClick={generateGuide}
-                   className="px-8 py-3 bg-primary hover:bg-primaryhover text-white rounded-xl font-bold shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all flex items-center gap-3 mx-auto"
+                   disabled={isGeneratingGuide}
+                   className="px-8 py-3 bg-primary hover:bg-primaryhover text-white rounded-xl font-bold shadow-[0_0_20px_rgba(249,115,22,0.4)] transition-all flex items-center gap-3 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
                  >
-                   Generar Guía de Implementación
-                   <ArrowRight className="w-5 h-5" />
+                   {isGeneratingGuide ? (
+                     <>
+                       <Loader2 className="w-5 h-5 animate-spin" />
+                       Diseñando Estrategia...
+                     </>
+                   ) : (
+                     <>
+                       Generar Guía de Implementación
+                       <ArrowRight className="w-5 h-5" />
+                     </>
+                   )}
                  </button>
                </div>
              ) : (

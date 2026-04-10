@@ -15,7 +15,7 @@ export async function logAction(user, action, details = '') {
       action,
       details,
     });
-  } catch (_) {
+  } catch {
     // El audit log nunca debe bloquear la app
   }
 }

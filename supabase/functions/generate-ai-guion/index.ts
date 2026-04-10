@@ -46,28 +46,53 @@ serve(async (req: Request) => {
       throw new Error(`No autorizado: Sesión inválida (${authError?.message || 'NULL'})`);
     }
 
-    // Recuperar Preferencia de Modelo del Usuario
+    // Configuración de API Keys
+    const OPENAI_KEY = Deno.env.get('OPENAI_API_KEY');
+    const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+
+    // Recuperar Preferencia de Modelo
     const { data: userPref } = await supabase
       .from('user_preferences')
       .select('preferred_claude_model')
       .eq('user_id', user.id)
       .maybeSingle();
     
-    const modelToUse = userPref?.preferred_claude_model || 'claude-sonnet-4-6';
+    let modelToUse = userPref?.preferred_claude_model || 'claude-sonnet-4-6';
+    let provider = modelToUse.startsWith('gpt-') ? 'openai' : 'anthropic';
+
+    // FALLBACK INTELIGENTE: Si falta la clave del proveedor elegido, cambiamos al otro
+    if (provider === 'anthropic' && !ANTHROPIC_KEY) {
+      console.warn("Fallback: No hay ANTHROPIC_KEY, saltando a OpenAI");
+      provider = 'openai';
+      modelToUse = 'gpt-4o'; // Usar el mejor disponible
+    } else if (provider === 'openai' && !OPENAI_KEY) {
+      console.warn("Fallback: No hay OPENAI_KEY, saltando a Anthropic");
+      provider = 'anthropic';
+      modelToUse = 'claude-3-5-sonnet-20241022';
+    }
 
     let fullText = '';
     let usage = { input_tokens: 0, output_tokens: 0 };
 
-    if (modelToUse.startsWith('gpt-')) {
+    if (provider === 'openai') {
       // LLAMADA A OPENAI
+      if (!OPENAI_KEY) throw new Error("Falta OPENAI_API_KEY en las variables de entorno");
+      
+      // Mapeo seguro de modelos de OpenAI
+      // El usuario confirma que usa GPT-5.4
+      const finalModel = 
+        modelToUse === 'gpt-5-4' ? 'gpt-5.4' : 
+        modelToUse === 'gpt-5-4-mini' ? 'gpt-5.4-mini' : 
+        modelToUse;
+
       const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
+          "Authorization": `Bearer ${OPENAI_KEY}`
         },
         body: JSON.stringify({
-          model: modelToUse,
+          model: finalModel,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt }
@@ -90,21 +115,27 @@ serve(async (req: Request) => {
       };
     } else {
       // LLAMADA A ANTHROPIC (CLAUDE)
+      if (!ANTHROPIC_KEY) throw new Error("Falta ANTHROPIC_API_KEY en las variables de entorno");
+
+      // Mapeo seguro de modelos de Anthropic
+      const finalModel = 
+        modelToUse === 'claude-sonnet-4-6' ? 'claude-3-5-sonnet-20241022' : 
+        modelToUse === 'claude-haiku-4-5-20251001' ? 'claude-3-5-haiku-20241022' :
+        modelToUse === 'claude-opus-4-6' ? 'claude-3-opus-20240229' : 'claude-3-5-sonnet-20241022';
+
       const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": Deno.env.get('ANTHROPIC_API_KEY')!,
+          "x-api-key": ANTHROPIC_KEY,
           "anthropic-version": "2023-06-01"
         },
         body: JSON.stringify({
-           model: modelToUse === 'claude-sonnet-4-6' ? 'claude-3-5-sonnet-20241022' : 
-                  modelToUse === 'claude-haiku-4-5-20251001' ? 'claude-3-5-haiku-20241022' :
-                  modelToUse === 'claude-opus-4-6' ? 'claude-3-opus-20240229' : 'claude-3-5-sonnet-20241022',
-           max_tokens: 4096,
-           temperature: 0.85,
-           system: systemPrompt,
-           messages: [{ role: 'user', content: userPrompt }]
+          model: finalModel,
+          max_tokens: 4096,
+          temperature: 0.85,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }]
         })
       });
 

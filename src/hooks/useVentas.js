@@ -59,7 +59,7 @@ export function useVentas() {
     // We add 12:00:00 to avoid UTC timezone offset putting it on the previous day
     const fechaTimestamp = entry.fecha ? new Date(`${entry.fecha}T12:00:00Z`).toISOString() : undefined;
 
-    const { data, error } = await supabase.from('ventas').insert({
+    const { error } = await supabase.from('ventas').insert({
       servicio: entry.servicio,
       cliente_nombre: entry.clienteNombre,
       cliente_email: entry.clienteEmail,

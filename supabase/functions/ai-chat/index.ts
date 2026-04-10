@@ -154,6 +154,12 @@ ${metricsContext || 'No hay métricas registradas todavía. Habla sobre estrateg
 
     if (modelToUse.startsWith('gpt-')) {
       // LLAMADA A OPENAI
+      // Mapeo seguro para GPT-5.4
+      const finalModel = 
+        modelToUse === 'gpt-5-4' ? 'gpt-5.4' : 
+        modelToUse === 'gpt-5-4-mini' ? 'gpt-5.4-mini' : 
+        modelToUse;
+
       const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: "POST",
         headers: {
@@ -161,7 +167,7 @@ ${metricsContext || 'No hay métricas registradas todavía. Habla sobre estrateg
           "Authorization": `Bearer ${Deno.env.get('OPENAI_API_KEY')}`
         },
         body: JSON.stringify({
-          model: modelToUse,
+          model: finalModel,
           messages: is_copy_generation 
             ? [{ role: 'system', content: "Eres un redactor creativo experto en Meta Ads. Genera solo el JSON solicitado sin explicaciones." }, { role: 'user', content: message }]
             : [{ role: 'system', content: systemPrompt }, ...formattedHistory],
