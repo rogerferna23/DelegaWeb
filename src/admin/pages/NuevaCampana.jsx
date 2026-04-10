@@ -63,7 +63,12 @@ export default function NuevaCampana() {
     try {
       setIsLoadingProfiles(true);
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      
+      if (!user) {
+        console.warn('NuevaCampana: No se encontró usuario al cargar perfiles.');
+        setIsLoadingProfiles(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from('business_profiles')
@@ -71,7 +76,11 @@ export default function NuevaCampana() {
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error detallado de Supabase (400?):', error);
+        throw error;
+      }
+      
       setProfiles(data || []);
     } catch (err) {
       console.error('Error cargando perfiles:', err);

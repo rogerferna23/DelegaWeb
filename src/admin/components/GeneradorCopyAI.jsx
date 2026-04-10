@@ -33,31 +33,47 @@ NO incluyas explicaciones, solo el JSON.`;
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: { 
           message: prompt,
-          is_copy_generation: true // Flag para que el backend sepa que es una generación de copy
+          is_copy_generation: true
         }
       });
 
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
+      if (error) {
+        console.error('Error invocando Edge Function:', error);
+        // Si el error tiene respuesta de texto, intentamos leerlo
+        let detailedError = error.message;
+        if (error.context && typeof error.context.text === 'function') {
+           const text = await error.context.text();
+           detailedError = `${error.message}: ${text}`;
+        }
+        throw new Error(`Error de conexión con la IA: ${detailedError}`);
+      }
 
-      // El backend debe devolver el JSON parseado en el campo 'message' o similar
+      if (data?.error) throw new Error(data.error);
+      if (!data || !data.message) throw new Error('La IA no devolvió ninguna respuesta.');
+
       let generated = [];
       try {
         if (typeof data.message === 'string') {
+          // Limpiar posible código markdown o texto extra
           const jsonMatch = data.message.match(/\[[\s\S]*\]/);
-          generated = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+          const cleanJson = jsonMatch ? jsonMatch[0] : data.message;
+          generated = JSON.parse(cleanJson);
         } else {
           generated = data.message || [];
         }
+
+        if (!Array.isArray(generated)) {
+          generated = [generated]; // Intentar convertir a array si vino un solo objeto
+        }
       } catch (parseErr) {
-        console.error('Error parseando JSON de IA:', parseErr);
-        throw new Error('La IA devolvió un formato no válido. Intenta de nuevo.');
+        console.error('Error parseando JSON de IA:', parseErr, data.message);
+        throw new Error('El formato de respuesta de la IA no es válido. Prueba de nuevo.');
       }
 
       setResults(generated);
     } catch (err) {
-      console.error('Error generando copy:', err);
-      alert(`Error: ${err.message || 'Hubo un error al generar los textos. Por favor intenta de nuevo.'}`);
+      console.error('Error completo en GeneradorCopyAI:', err);
+      alert(`${err.message || 'Hubo un error al generar los textos. Por favor intenta de nuevo.'}`);
     } finally {
       setIsGenerating(false);
     }

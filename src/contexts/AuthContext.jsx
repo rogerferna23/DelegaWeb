@@ -13,12 +13,25 @@ export function AuthProvider({ children }) {
 
   const fetchProfile = async (user) => {
     if (!user) return null;
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    return data;
+    try {
+      // Safety timeout: if profile loading takes > 5s, continue without profile (fail fast)
+      const profilePromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('PROFILE_TIMEOUT')), 5000)
+      );
+
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.warn("fetchProfile: Error o timeout al cargar perfil:", err.message);
+      return null;
+    }
   };
 
   const fetchAllProfiles = async () => {
@@ -76,25 +89,42 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const initSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // Safety timeout for initial session retrieval (8 seconds max)
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('INIT_TIMEOUT')), 8000)
+        );
+
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
         if (session) await applySession(session.user);
         else setLoading(false);
       } catch (err) {
-        console.error("Error al inicializar sesión:", err);
+        console.error("AuthContext: Error o timeout al inicializar sesión:", err.message);
         setLoading(false);
       }
     };
 
     initSession();
 
+    // Secondary safety: Ensure loading is ALWAYS false after 10s regardless of anything else
+    const hardTimeout = setTimeout(() => {
+      setLoading(prev => {
+        if (prev) console.warn("AuthContext: Forzando fin de carga por hard-timeout.");
+        return false;
+      });
+    }, 10000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
-        // Prevent auto-applying session if MFA is required (aal1 -> aal2 escalation needed).
-        // This ensures AdminLogin don't redirect before the second factor is entered.
-        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1' && event !== 'SIGNED_OUT') {
-          setLoading(false);
-          return;
+        // Prevent auto-applying session if MFA is required
+        try {
+          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1' && event !== 'SIGNED_OUT') {
+            setLoading(false);
+            return;
+          }
+        } catch (mfaErr) {
+          console.warn("AuthContext: Error checking AAL in state change:", mfaErr);
         }
         await applySession(session.user);
       } else {
@@ -103,8 +133,39 @@ export function AuthProvider({ children }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(hardTimeout);
+    };
   }, [applySession]);
+
+  // --- Inactivity Monitoring (15 minutes) ---
+  useEffect(() => {
+    if (!currentUser) return;
+
+    let inactivityTimer;
+    const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutos en ms
+
+    const resetTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => {
+        console.warn("Cerrando sesión por inactividad (15 min)");
+        logout();
+        alert("Tu sesión ha expirado por inactividad. Por favor, inicia sesión de nuevo.");
+      }, INACTIVITY_LIMIT);
+    };
+
+    // Eventos que resetean el temporizador
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(name => document.addEventListener(name, resetTimer));
+
+    resetTimer(); // Iniciar temporizador al montar/loguear
+
+    return () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      events.forEach(name => document.removeEventListener(name, resetTimer));
+    };
+  }, [currentUser]);
 
   const login = async (email, password) => {
     try {
