@@ -20,6 +20,11 @@ serve(async (req: Request) => {
   }
 
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('No autorizado: Sin token');
+    }
+
     const { systemPrompt, userPrompt } = await req.json();
 
     if (!systemPrompt || !userPrompt) {
@@ -28,13 +33,18 @@ serve(async (req: Request) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
     
-    // Autenticación de usuario
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('No autorizado');
+    // Extraer el token puro (quitando "Bearer ")
+    const token = authHeader.replace("Bearer ", "");
+
+    // Autenticación de usuario explícita
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      throw new Error(`No autorizado: Sesión inválida (${authError?.message || 'NULL'})`);
+    }
 
     // Recuperar Preferencia de Modelo del Usuario
     const { data: userPref } = await supabase

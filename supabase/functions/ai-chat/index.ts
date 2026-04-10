@@ -30,12 +30,14 @@ serve(async (req: Request) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     );
     
-    // Autenticación de usuario con reintento o validación manual si es necesario
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Extraer el token puro (quitando "Bearer ")
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Autenticación de usuario explícita con el token recibido
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
       console.error("Auth: Error validando usuario:", authError?.message || "Usuario nulo");
