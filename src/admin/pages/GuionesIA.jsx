@@ -4,13 +4,14 @@ import {
   Sparkles, FileText, Clapperboard, Image as ImageIcon,
   Smartphone, Target, ShoppingCart, Brain, Star, Zap, Flame, Diamond,
   Map, BookOpen, Lightbulb, GraduationCap, MessageSquare, Ban, HelpCircle,
-  BarChart, CheckSquare, GitCompare, Eye, ClipboardCheck, ListOrdered,
-  TrendingUp, Puzzle, Wand2, Loader2, PenTool, LayoutTemplate, Volume2, Archive, Download
+  TrendingUp, Puzzle, Wand2, Loader2, PenTool, LayoutTemplate, Volume2, Archive, Download,
+  Briefcase, Save, Trash2, Plus, Search, Sparkles as SparklesIcon
 } from 'lucide-react';
 import { CopyButton, VideoResultView, CarouselResultView, OptimizacionResultView } from '../components/guiones/GuionResultViews';
 import GuionesHistoryView from '../components/guiones/GuionesHistoryView';
 import { buildGuionPrompt } from '../components/guiones/GuionPromptBuilder';
 import { generarGuionDocx } from '../utils/generarGuionDocx';
+import { supabase } from '../../lib/supabase';
 
 export default function GuionesIA() {
   const [activeTab, setActiveTab] = useState('generar'); // 'generar' | 'historial'
@@ -34,6 +35,112 @@ export default function GuionesIA() {
   const [formData, setFormData] = useState({
     nombre: '', servicio: '', cliente: '', problema: '', resultado: ''
   });
+
+  // Perfiles de Negocio
+  const [profiles, setProfiles] = useState([]);
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [selectedProfileId, setSelectedProfileId] = useState(null);
+
+  useEffect(() => {
+    fetchProfiles();
+  }, []);
+
+  const fetchProfiles = async () => {
+    try {
+      setIsLoadingProfiles(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('business_profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setProfiles(data || []);
+    } catch (err) {
+      console.error('Error cargando perfiles:', err);
+    } finally {
+      setIsLoadingProfiles(false);
+    }
+  };
+
+  const handleSelectProfile = (profile) => {
+    if (!profile) {
+      setSelectedProfileId(null);
+      setFormData({ nombre: '', servicio: '', cliente: '', problema: '', resultado: '' });
+      return;
+    }
+
+    setSelectedProfileId(profile.id);
+    setFormData({
+      nombre: profile.company_name,
+      servicio: profile.offer,
+      cliente: profile.ideal_client,
+      problema: profile.differentiator || '',
+      resultado: formData.resultado // Mantener lo que estaba si ya hay algo
+    });
+  };
+
+  const saveProfile = async () => {
+    if (!formData.nombre || !formData.servicio) {
+      setErrorMsg('El nombre y servicio son obligatorios para guardar el perfil.');
+      return;
+    }
+
+    try {
+      setIsSavingProfile(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuario no autenticado');
+
+      const profileData = {
+        user_id: user.id,
+        company_name: formData.nombre,
+        offer: formData.servicio,
+        ideal_client: formData.cliente,
+        differentiator: formData.problema,
+        price_range: 'Variable', // Default para guiones
+        sales_method: 'other'    // Default para guiones
+      };
+
+      let result;
+      if (selectedProfileId) {
+        // Actualizar existente
+        result = await supabase
+          .from('business_profiles')
+          .update(profileData)
+          .eq('id', selectedProfileId)
+          .select();
+      } else {
+        // Buscar si ya existe por nombre para evitar duplicados
+        const existing = profiles.find(p => p.company_name.toLowerCase() === formData.nombre.toLowerCase());
+        if (existing) {
+          result = await supabase
+            .from('business_profiles')
+            .update(profileData)
+            .eq('id', existing.id)
+            .select();
+        } else {
+          // Crear nuevo
+          result = await supabase.from('business_profiles').insert([profileData]).select();
+        }
+      }
+
+      if (result.error) throw result.error;
+
+      if (result.data && result.data[0]) {
+        setSelectedProfileId(result.data[0].id);
+        await fetchProfiles();
+      }
+    } catch (err) {
+      console.error('Error guardando perfil:', err);
+      setErrorMsg('No se pudo guardar el perfil.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   const handleChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -218,13 +325,52 @@ export default function GuionesIA() {
             
             {/* Paso 1 */}
             <div className="p-6 border-b border-white/5">
-              <div className="flex items-center gap-2 mb-6">
-                <FileText className="w-5 h-5 text-gray-300" />
-                <h2 className="text-base font-bold text-white">Paso 1 — Información de tu negocio</h2>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-gray-300" />
+                  <h2 className="text-base font-bold text-white">Paso 1 — Información de tu negocio</h2>
+                </div>
+
+                {/* Selector de Perfiles */}
+                <div className="flex items-center gap-2 bg-black/40 p-1 rounded-xl border border-white/5">
+                  <div className="flex items-center gap-2 px-3 py-1.5 overflow-x-auto max-w-[300px] no-scrollbar">
+                    <button
+                      onClick={() => handleSelectProfile(null)}
+                      className={`whitespace-nowrap px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${!selectedProfileId ? 'bg-primary text-white' : 'bg-white/5 text-gray-400 hover:text-white'}`}
+                    >
+                      Nuevo
+                    </button>
+                    {profiles.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => handleSelectProfile(p)}
+                        className={`whitespace-nowrap px-3 py-1 rounded-lg text-[10px] font-bold transition-all ${selectedProfileId === p.id ? 'bg-white/10 text-white border border-white/10' : 'bg-white/5 text-gray-400 hover:text-white'}`}
+                      >
+                        {p.company_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-2">Nombre del negocio</label>
+                <div className="relative">
+                  <label className="flex justify-between items-center text-xs font-semibold text-gray-400 uppercase mb-2">
+                    Nombre del negocio
+                    <button 
+                      onClick={saveProfile}
+                      disabled={isSavingProfile || !formData.nombre}
+                      className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-all font-bold group"
+                      title={selectedProfileId ? "Actualizar perfil guardado" : "Guardar como perfil nuevo"}
+                    >
+                      {isSavingProfile ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Save className="w-3 h-3 group-hover:scale-110 transition-transform" />
+                      )}
+                      {selectedProfileId ? 'Actualizar' : 'Guardar'}
+                    </button>
+                  </label>
                   <input type="text" name="nombre" value={formData.nombre} onChange={handleChange} placeholder="Ej: DelegaWeb" className="w-full bg-background border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-primary/50" />
                 </div>
                 <div>
