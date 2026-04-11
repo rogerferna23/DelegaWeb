@@ -214,47 +214,6 @@ export default function GuionesIA() {
 
       {activeTab === 'generar' && (
         <>
-          {/* Si estamos viendo un guion del historial */}
-          {guionEnVista && resultData && (
-            <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 flex items-center justify-between">
-              <p className="text-sm text-primary font-medium flex items-center gap-2">
-                <Archive className="w-4 h-4" /> Viendo guión del historial guardado.
-              </p>
-              <button 
-                onClick={() => { setGuionEnVista(null); setResultData(null); }}
-                className="text-xs font-bold text-white bg-primary px-3 py-1.5 rounded-lg"
-              >
-                Crear Nuevo
-              </button>
-            </div>
-          )}
-
-          {/* Resultados Render */}
-          {resultData && !isGenerating && (
-             <div className="bg-cardbg border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.1)] rounded-2xl p-6 md:p-8">
-               <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-6 h-6 text-green-400" /> Resultado Generado
-                  </h2>
-                  <button
-                    onClick={handleDescargarDocx}
-                    disabled={isDownloading}
-                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all border border-white/10 hover:border-white/20 disabled:opacity-50"
-                  >
-                    {isDownloading ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Generando Word...</>
-                    ) : (
-                      <><Download className="w-4 h-4" /> Descargar Word</>
-                    )}
-                  </button>
-               </div>
-
-               {generarType === 'optimizar' && <OptimizacionResultView data={resultData} />}
-               {generarType === 'carrusel' && <CarouselResultView data={resultData} />}
-               {(generarType === 'video_publicidad' || generarType === 'video_contenido') && <VideoResultView data={resultData} />}
-             </div>
-          )}
-
           <div className={`bg-cardbg border border-white/10 rounded-2xl overflow-hidden transition-opacity ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
             
             {/* Paso 1 */}
@@ -402,6 +361,32 @@ export default function GuionesIA() {
             </div>
 
           </div>
+
+          {/* Resultados Render - MOVIDO AL FINAL */}
+          {resultData && !isGenerating && (
+             <div className="bg-cardbg border border-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.1)] rounded-2xl p-6 md:p-8 mt-8">
+               <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-green-400" /> Resultado Generado
+                  </h2>
+                  <button
+                    onClick={handleDescargarDocx}
+                    disabled={isDownloading}
+                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all border border-white/10 hover:border-white/20 disabled:opacity-50"
+                  >
+                    {isDownloading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Generando Word...</>
+                    ) : (
+                      <><Download className="w-4 h-4" /> Descargar Word</>
+                    )}
+                  </button>
+               </div>
+
+               {generarType === 'optimizar' && <OptimizacionResultView data={resultData} />}
+               {generarType === 'carrusel' && <CarouselResultView data={resultData} />}
+               {(generarType === 'video_publicidad' || generarType === 'video_contenido') && <VideoResultView data={resultData} />}
+             </div>
+          )}
         </>
       )}
     </div>
