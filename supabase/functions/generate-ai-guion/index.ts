@@ -117,11 +117,11 @@ serve(async (req: Request) => {
       // LLAMADA A ANTHROPIC (CLAUDE)
       if (!ANTHROPIC_KEY) throw new Error("Falta ANTHROPIC_API_KEY en las variables de entorno");
 
-      // Mapeo seguro de modelos de Anthropic
+      // Mapeo seguro de modelos de Anthropic (Basado en la lista actual del usuario)
       const finalModel = 
-        modelToUse === 'claude-sonnet-4-6' ? 'claude-3-5-sonnet-20241022' : 
-        modelToUse === 'claude-haiku-4-5-20251001' ? 'claude-3-5-haiku-20241022' :
-        modelToUse === 'claude-opus-4-6' ? 'claude-3-opus-20240229' : 'claude-3-5-sonnet-20241022';
+        modelToUse === 'claude-sonnet-4-6' ? 'claude-sonnet-4-6' : 
+        modelToUse === 'claude-haiku-4-5-20251001' ? 'claude-haiku-4-5-20251001' :
+        modelToUse === 'claude-opus-4-6' ? 'claude-opus-4-6' : 'claude-sonnet-4-6';
 
       const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: "POST",
