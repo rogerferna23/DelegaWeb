@@ -5,11 +5,12 @@ import {
   Smartphone, Target, ShoppingCart, Brain, Star, Zap, Flame, Diamond,
   Map, BookOpen, Lightbulb, GraduationCap, MessageSquare, Ban, HelpCircle,
   BarChart, CheckSquare, GitCompare, Eye, ClipboardCheck, ListOrdered,
-  TrendingUp, Puzzle, Wand2, Loader2, PenTool, LayoutTemplate, Volume2, Archive
+  TrendingUp, Puzzle, Wand2, Loader2, PenTool, LayoutTemplate, Volume2, Archive, Download
 } from 'lucide-react';
 import { CopyButton, VideoResultView, CarouselResultView, OptimizacionResultView } from '../components/guiones/GuionResultViews';
 import GuionesHistoryView from '../components/guiones/GuionesHistoryView';
 import { buildGuionPrompt } from '../components/guiones/GuionPromptBuilder';
+import { generarGuionDocx } from '../utils/generarGuionDocx';
 
 export default function GuionesIA() {
   const [activeTab, setActiveTab] = useState('generar'); // 'generar' | 'historial'
@@ -23,6 +24,7 @@ export default function GuionesIA() {
 
   // Estado del generador
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [resultData, setResultData] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   
@@ -108,6 +110,19 @@ export default function GuionesIA() {
       setErrorMsg(err.message || 'Error de conexión con la IA.');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleDescargarDocx = async () => {
+    if (!resultData) return;
+    setIsDownloading(true);
+    try {
+      await generarGuionDocx(resultData, generarType, formData);
+    } catch (err) {
+      console.error('Error generando DOCX:', err);
+      setErrorMsg('Error al generar el documento Word.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -221,6 +236,17 @@ export default function GuionesIA() {
                   <h2 className="text-xl font-bold text-white flex items-center gap-2">
                     <Sparkles className="w-6 h-6 text-green-400" /> Resultado Generado
                   </h2>
+                  <button
+                    onClick={handleDescargarDocx}
+                    disabled={isDownloading}
+                    className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all border border-white/10 hover:border-white/20 disabled:opacity-50"
+                  >
+                    {isDownloading ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Generando Word...</>
+                    ) : (
+                      <><Download className="w-4 h-4" /> Descargar Word</>
+                    )}
+                  </button>
                </div>
 
                {generarType === 'optimizar' && <OptimizacionResultView data={resultData} />}
