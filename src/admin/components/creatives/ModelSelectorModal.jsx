@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Image as ImageIcon, Video, ChevronDown, Check } from 'lucide-react';
+import { X, ChevronDown, Check } from 'lucide-react';
 import {
   IMAGE_MODELS, VIDEO_MODELS,
   IMAGE_FILTERS, VIDEO_FILTERS,
@@ -33,7 +33,7 @@ export default function ModelSelectorModal({ isOpen, onClose, onSelect, currentM
     return result;
   }, [models, activeFilter, sortBy]);
 
-  const recommended = mediaType === 'image' && activeFilter === 'Todos'
+  const recommended = activeFilter === 'Todos'
     ? models.filter(m => m.recommended)
     : [];
 
@@ -80,7 +80,7 @@ export default function ModelSelectorModal({ isOpen, onClose, onSelect, currentM
                   : 'bg-white/5 text-gray-400 hover:text-white'
               }`}
             >
-              <ImageIcon className="w-3.5 h-3.5" /> Imagen
+              <span className="text-base leading-none">🖼️</span> Imagen
             </button>
             <button
               onClick={() => { setMediaType('video'); setActiveFilter('Todos'); }}
@@ -90,7 +90,7 @@ export default function ModelSelectorModal({ isOpen, onClose, onSelect, currentM
                   : 'bg-white/5 text-gray-400 hover:text-white'
               }`}
             >
-              <Video className="w-3.5 h-3.5" /> Video
+              <span className="text-base leading-none">🎬</span> Video
             </button>
           </div>
 
@@ -146,8 +146,8 @@ export default function ModelSelectorModal({ isOpen, onClose, onSelect, currentM
           {/* Recommended Section */}
           {recommended.length > 0 && (
             <div className="mb-6">
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">
-                Recomendados para ti
+              <p className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                <span className="text-primary text-sm">✨</span> Recomendados para ti
               </p>
               {recommended.map(model => (
                 <ModelCard
@@ -164,7 +164,7 @@ export default function ModelSelectorModal({ isOpen, onClose, onSelect, currentM
 
           {/* All Models */}
           <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-3">
-            TODOS LOS MODELOS · {filteredModels.length}
+            TODOS LOS MODELOS - {filteredModels.length}
           </p>
 
           {filteredModels.length > 0 ? (
@@ -223,7 +223,7 @@ function ModelCard({ model, isSelected, onSelect, siglaColors, showRecommended }
       )}
 
       {/* Sigla + Name + Tag */}
-      <div className="flex items-start gap-3 mb-1.5">
+      <div className="flex items-start gap-3 mb-1.5 pr-6">
         <div
           className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
           style={{

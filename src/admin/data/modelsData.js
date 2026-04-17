@@ -167,8 +167,8 @@ export const VIDEO_MODELS = [
     name: 'Seedance 2.0',
     company: 'ByteDance',
     tag: 'CONTROL',
-    tagColor: '#3b82f6',    // azul
-    tagIcon: '⚙',
+    tagColor: '#ef4444',    // rojo
+    tagIcon: '🎛️',
     description: 'Control tipo director. 12 refs (imagen+video+audio). Control creativo total.',
     pricePerUnit: '$0.14/seg',
     unitsPerDollar: '~7 seg por $1',
@@ -182,7 +182,7 @@ export const VIDEO_MODELS = [
     name: 'Seedance 1.5 Pro',
     company: 'ByteDance',
     tag: 'AUDIO',
-    tagColor: '#06b6d4',    // cyan
+    tagColor: '#0d9488',    // teal
     tagIcon: '🔊',
     description: 'Audio nativo + lip-sync. Mejor relación calidad/precio para producción diaria.',
     pricePerUnit: '$0.05/seg',
@@ -190,6 +190,7 @@ export const VIDEO_MODELS = [
     generationCost: '$0.50 · 50 cr',
     credits: 50,
     category: 'audio',
+    recommended: true,
   },
   {
     id: 'kling-3-0-pro',
@@ -197,7 +198,7 @@ export const VIDEO_MODELS = [
     name: 'Kling 3.0 Pro',
     company: 'Kuaishou',
     tag: 'MOVIMIENTO',
-    tagColor: '#eab308',    // amarillo
+    tagColor: '#ef4444',    // rojo
     tagIcon: '⚡',
     description: 'Mejor movimiento humano realista. Multi-shot con consistencia. Hasta 4K.',
     pricePerUnit: '$0.22/seg',
@@ -227,7 +228,7 @@ export const VIDEO_MODELS = [
     name: 'Veo 3.1',
     company: 'Google',
     tag: 'CINE',
-    tagColor: '#a855f7',    // morado
+    tagColor: '#9333ea',    // morado
     tagIcon: '🎬',
     description: 'Calidad cinematográfica máxima. Mejor lip-sync y audio. Premium.',
     pricePerUnit: '$0.40/seg',
@@ -242,7 +243,7 @@ export const VIDEO_MODELS = [
     name: 'Veo 3',
     company: 'Google',
     tag: 'CINE',
-    tagColor: '#a855f7',    // morado
+    tagColor: '#9333ea',    // morado
     tagIcon: '🎬',
     description: 'Audio nativo Google. Diálogo, efectos de sonido y ambiente integrados.',
     pricePerUnit: '$0.40/seg',
@@ -258,7 +259,7 @@ export const VIDEO_MODELS = [
     company: 'OpenAI',
     tag: 'FÍSICA',
     tagColor: '#6366f1',    // índigo
-    tagIcon: '⚛',
+    tagIcon: '⚛️',
     description: 'Mejor simulación de física real. Agua, gravedad, objetos creíbles. Hasta 20s.',
     pricePerUnit: '$0.15/seg',
     unitsPerDollar: '~6.6 seg por $1',
@@ -272,7 +273,7 @@ export const VIDEO_MODELS = [
     name: 'Hailuo 2.3',
     company: 'MiniMax',
     tag: 'RÁPIDO',
-    tagColor: '#3b82f6',    // azul
+    tagColor: '#0ea5e9',    // azul claro
     tagIcon: '⚡',
     description: 'Precio fijo por video. Prototipado rápido de ideas y contenido social.',
     pricePerUnit: '$0.49/vid',
@@ -302,7 +303,7 @@ export const VIDEO_MODELS = [
     name: 'PixVerse v5.6',
     company: 'PixVerse',
     tag: 'EFECTOS',
-    tagColor: '#ec4899',    // rosa/magenta
+    tagColor: '#d946ef',    // fucsia
     tagIcon: '✨',
     description: 'Transiciones creativas y efectos visuales. Menos realista, más artístico.',
     pricePerUnit: '$0.35/vid',
