@@ -10,8 +10,7 @@ import MyLibrary from '../components/creatives/MyLibrary';
 import TemplatesGallery from '../components/creatives/TemplatesGallery';
 import HistoryTab from '../components/creatives/HistoryTab';
 import ModelSelectorModal from '../components/creatives/ModelSelectorModal';
-import GenerarImageModal from '../components/creatives/GenerarImageModal';
-import GenerarVideoModal from '../components/creatives/GenerarVideoModal';
+import GenerationSidebar from '../components/creatives/GenerationSidebar';
 
 const TABS = [
   { id: 'generar', label: 'Generar' },
@@ -25,31 +24,26 @@ export default function Creativos() {
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [selectedModel, setSelectedModel] = useState(null);
 
-  // Generator views
-  const [generatorView, setGeneratorView] = useState(null); // null | 'image' | 'video'
-  const [initialPrompt, setInitialPrompt] = useState('');
+  // Sidebar state
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [activePreset, setActivePreset] = useState(null);
+  const [activeMediaType, setActiveMediaType] = useState('imagen');
 
   const handleOpenGenerator = (mediaType, preset) => {
-    setInitialPrompt(preset?.name || '');
-    if (mediaType === 'imagen') {
-      setGeneratorView('image');
-    } else {
-      setGeneratorView('video');
-    }
+    setActivePreset(preset);
+    setActiveMediaType(mediaType);
+    setShowSidebar(true);
   };
 
-  const handleBack = () => {
-    setGeneratorView(null);
-    setInitialPrompt('');
+  const handleOpenModelSelector = () => {
+    setShowModelSelector(true);
   };
 
-  // If in a full-screen generator view, render it
-  if (generatorView === 'image') {
-    return <GenerarImageModal onBack={handleBack} initialPrompt={initialPrompt} />;
-  }
-  if (generatorView === 'video') {
-    return <GenerarVideoModal onBack={handleBack} initialPrompt={initialPrompt} />;
-  }
+  const handleModelSelected = (model) => {
+    setSelectedModel(model);
+    setShowModelSelector(false);
+    // You could optionally re-open the sidebar if it was the context
+  };
 
   return (
     <div className="animate-in fade-in duration-500">
@@ -161,8 +155,18 @@ export default function Creativos() {
       <ModelSelectorModal
         isOpen={showModelSelector}
         onClose={() => setShowModelSelector(false)}
-        onSelect={model => setSelectedModel(model)}
+        onSelect={handleModelSelected}
         currentModelId={selectedModel?.id}
+      />
+
+      {/* Generation Sidebar */}
+      <GenerationSidebar
+        isOpen={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        preset={activePreset}
+        mediaType={activeMediaType}
+        onOpenModelSelector={handleOpenModelSelector}
+        selectedModelId={selectedModel?.id || (activeMediaType === 'imagen' ? 'flux-2-pro' : 'veo-3-1')}
       />
     </div>
   );
