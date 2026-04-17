@@ -11,7 +11,6 @@ import { CopyButton, VideoResultView, CarouselResultView, OptimizacionResultView
 import GuionesHistoryView from '../components/guiones/GuionesHistoryView';
 import { buildGuionPrompt } from '../components/guiones/GuionPromptBuilder';
 import { generarGuionDocx } from '../utils/generarGuionDocx';
-import { supabase } from '../../lib/supabase';
 
 export default function GuionesIA() {
   const [activeTab, setActiveTab] = useState('generar'); // 'generar' | 'historial'
@@ -56,6 +55,7 @@ export default function GuionesIA() {
         .from('business_profiles')
         .select('*')
         .eq('user_id', user.id)
+        .eq('type', 'script') // Filtrar solo guiones
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -101,8 +101,10 @@ export default function GuionesIA() {
         offer: formData.servicio,
         ideal_client: formData.cliente,
         differentiator: formData.problema,
-        price_range: 'Variable', // Default para guiones
-        sales_method: 'other'    // Default para guiones
+        target_result: formData.resultado, // Guardar resultado (campo nuevo)
+        price_range: 'Variable', 
+        sales_method: 'other',
+        type: 'script' // Marcar como tipo guion
       };
 
       let result;

@@ -77,6 +77,7 @@ export default function NuevaCampana() {
         .from('business_profiles')
         .select('*')
         .eq('user_id', user.id)
+        .or('type.eq.campaign,type.is.null') // Traer campañas o perfiles viejos (null)
         .order('updated_at', { ascending: false });
 
       if (error) {
@@ -120,7 +121,8 @@ export default function NuevaCampana() {
         ideal_client: formData.ideal_client,
         differentiator: formData.differentiator,
         price_range: formData.price_range,
-        sales_method: formData.sales_method
+        sales_method: formData.sales_method,
+        type: 'campaign' // Marcar como tipo campaña
       };
 
       let result;
