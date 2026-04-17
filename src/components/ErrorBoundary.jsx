@@ -4,8 +4,8 @@ import { logFrontendError } from "../utils/errorLogger";
 export class ErrorBoundary extends Component {
   state = { hasError: false };
 
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
@@ -18,8 +18,11 @@ export class ErrorBoundary extends Component {
         <div className="flex flex-col items-center justify-center min-h-screen bg-background text-white p-6 text-center">
           <div className="bg-cardbg border border-white/10 p-8 rounded-2xl shadow-xl max-w-md">
             <h2 className="text-xl font-bold mb-4 text-primary">Algo salió mal</h2>
-            <p className="text-gray-400 text-sm mb-6">
+            <p className="text-gray-400 text-sm mb-2">
               Ha ocurrido un error inesperado. Hemos registrado el incidente para solucionarlo lo antes posible.
+            </p>
+            <p className="text-red-400 font-mono text-xs text-left p-4 bg-black/50 rounded-xl mb-6 overflow-auto">
+              {this.state.error?.toString()}
             </p>
             <button
               className="px-6 py-2 bg-primary hover:bg-primaryhover text-white rounded-xl font-bold transition-all"
