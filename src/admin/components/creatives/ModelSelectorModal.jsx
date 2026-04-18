@@ -209,9 +209,9 @@ function ModelCard({ model, isSelected, onSelect, siglaColors, showRecommended }
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left p-4 rounded-2xl border transition-all relative ${
+      className={`w-full text-left p-4 rounded-2xl border transition-all relative flex flex-col h-full ${
         isSelected
-          ? 'bg-primary/5 border-primary/60'
+          ? 'bg-white/[0.02] border-primary'
           : 'bg-white/[0.02] border-white/5 hover:border-white/10'
       }`}
     >
@@ -223,9 +223,9 @@ function ModelCard({ model, isSelected, onSelect, siglaColors, showRecommended }
       )}
 
       {/* Sigla + Name + Tag */}
-      <div className="flex items-start gap-3 mb-1.5 pr-6">
+      <div className="flex items-start gap-3 mb-3 pr-6">
         <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0"
           style={{
             backgroundColor: `${siglaColors[model.sigla] || '#666'}15`,
             color: siglaColors[model.sigla] || '#666',
@@ -234,36 +234,41 @@ function ModelCard({ model, isSelected, onSelect, siglaColors, showRecommended }
           {model.sigla}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-sm font-bold text-white">{model.name}</span>
             <span
-              className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide"
+              className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider flex items-center"
               style={{
                 backgroundColor: `${model.tagColor}20`,
                 color: model.tagColor,
+                border: `1px solid ${model.tagColor}40`
               }}
             >
-              {model.tagIcon && <span className="mr-0.5">{model.tagIcon}</span>}
+              {model.tagIcon && <span className="mr-1">{model.tagIcon}</span>}
               {model.tag}
             </span>
           </div>
-          <p className="text-[10px] text-gray-500 mt-0.5">{model.company}</p>
+          <p className="text-[11px] text-gray-400">{model.company}</p>
         </div>
       </div>
 
       {/* Description */}
-      <p className="text-[11px] text-primary/80 mb-3 leading-relaxed">
+      <p className="text-[11px] text-gray-300 mb-4 leading-relaxed line-clamp-2">
         {model.description}
       </p>
 
+      {/* Spacer to push pricing to bottom if descriptions vary in length */}
+      <div className="mt-auto"></div>
+
       {/* Pricing Row */}
-      <div className="flex items-center justify-between text-[10px]">
-        <div className="flex items-center gap-1">
-          <span className="font-bold text-white">{model.pricePerUnit}</span>
-          <span className="text-gray-600 ml-1">{model.unitsPerDollar}</span>
+      <div className="flex items-end justify-between w-full mt-2 pt-3">
+        <div className="flex flex-col gap-0.5">
+          <span className="font-bold text-white text-[12px]">{model.pricePerUnit}</span>
+          <span className="text-gray-500 text-[10px]">{model.unitsPerDollar}</span>
         </div>
-        <div className="text-gray-500">
-          Esta generación <span className="font-bold text-gray-400 ml-1">{model.generationCost}</span>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-gray-500 text-[10px] text-right">Esta generación</span>
+          <span className="font-bold text-primary text-[12px] text-right">{model.generationCost}</span>
         </div>
       </div>
     </button>
