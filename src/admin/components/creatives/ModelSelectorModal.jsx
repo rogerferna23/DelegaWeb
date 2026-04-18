@@ -13,8 +13,6 @@ export default function ModelSelectorModal({ isOpen, onClose, onSelect, currentM
   const [showSort, setShowSort] = useState(false);
   const [selectedId, setSelectedId] = useState(currentModelId || 'recraft-v3');
 
-  if (!isOpen) return null;
-
   const models = mediaType === 'image' ? IMAGE_MODELS : VIDEO_MODELS;
   const filters = mediaType === 'image' ? IMAGE_FILTERS : VIDEO_FILTERS;
 
@@ -48,6 +46,8 @@ export default function ModelSelectorModal({ isOpen, onClose, onSelect, currentM
     'AI': '#8b5cf6', 'X': '#fff', 'KS': '#eab308', 'MM': '#ec4899',
     'AL': '#06b6d4', 'PX': '#a855f7',
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
