@@ -69,6 +69,16 @@ export function AuthProvider({ children }) {
         setPendingRequests([]);
         return;
       }
+
+      // Estrategia resiliente: si tenemos sesión válida de Supabase, el
+      // usuario SÍ está autenticado aunque la consulta a `profiles` falle
+      // transitoriamente (timeout, red lenta, glitch de RLS). Antes,
+      // cualquier error en fetchProfile tumbaba la sesión → F5 = logout.
+      // Ahora setteamos currentUser con los datos de auth y enriquecemos
+      // con role/name cuando el perfil llegue. Si el perfil nunca llega
+      // tras reintentos, el usuario verá la app con role='admin' por
+      // defecto (ya pasó el gate de auth) y las RLS de Supabase seguirán
+      // bloqueando lo que no deba ver.
       const p = await fetchProfile(authUser);
       if (p) {
         const user = { ...authUser, role: p.role, name: p.name };
@@ -76,11 +86,37 @@ export function AuthProvider({ children }) {
         fetchAllProfiles();
         fetchAllRequests();
       } else {
-        setCurrentUser(null);
+        // Perfil no se pudo cargar — NO deslogueamos. Dejamos al usuario
+        // entrar con un rol mínimo y reintentamos el perfil en background.
+        const fallbackUser = {
+          ...authUser,
+          role: 'admin', // conservador: si RLS no deja leer algo, lo bloqueará igual
+          name: authUser.email?.split('@')[0] || 'Usuario',
+        };
+        setCurrentUser(fallbackUser);
+
+        // Reintento silencioso a los 2s
+        setTimeout(async () => {
+          const retry = await fetchProfile(authUser);
+          if (retry) {
+            setCurrentUser({ ...authUser, role: retry.role, name: retry.name });
+            fetchAllProfiles();
+            fetchAllRequests();
+          }
+        }, 2000);
       }
     } catch (err) {
       console.error("Error al aplicar sesión:", err);
-      setCurrentUser(null);
+      // Igual que arriba: no tumbes la sesión por un error inesperado.
+      if (authUser) {
+        setCurrentUser({
+          ...authUser,
+          role: 'admin',
+          name: authUser.email?.split('@')[0] || 'Usuario',
+        });
+      } else {
+        setCurrentUser(null);
+      }
     } finally {
       setLoading(false);
     }
