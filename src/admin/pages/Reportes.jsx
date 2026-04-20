@@ -13,6 +13,7 @@ import { SERVICES_CATALOG } from '../../constants/services';
 import { exportToExcel } from '../../utils/exportExcel';
 import { useAuth } from '../../contexts/AuthContext';
 import { sanitizeText } from '../../lib/sanitize';
+import { validate, gastoSchema, ventaSchema } from '../../schemas/forms.schema';
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const MONTH_NAMES = [
@@ -189,14 +190,17 @@ export default function Reportes() {
   const handleAddGasto = async (e) => {
     e.preventDefault();
     setFormError('');
-    if (!form.description.trim()) { setFormError('Agrega una descripción'); return; }
-    if (!form.amount || isNaN(form.amount) || parseFloat(form.amount) <= 0) { setFormError('Importe inválido'); return; }
-    if (!form.date) { setFormError('Selecciona una fecha'); return; }
+
+    const { ok, data, errors } = validate(gastoSchema, form);
+    if (!ok) {
+      setFormError(errors.description || errors.amount || errors.date || 'Datos inválidos');
+      return;
+    }
 
     if (isSuperAdmin) {
       // Superadmin: add directly
-      addGasto(form);
-      setOpenMonths(prev => new Set([...prev, getMonthKey(form.date)]));
+      addGasto(data);
+      setOpenMonths(prev => new Set([...prev, getMonthKey(data.date)]));
       setForm(EMPTY_FORM);
     } else {
       // Regular admin: submit request for approval
@@ -783,18 +787,26 @@ export default function Reportes() {
           <button
             onClick={() => {
               if (serviciosSeleccionados.length === 0) return setVentaError('Añade al menos un servicio a la venta.');
-              if (!ventaForm.clienteNombre.trim()) return setVentaError('El nombre del cliente es obligatorio.');
-              if (!ventaForm.importe || isNaN(ventaForm.importe) || parseFloat(ventaForm.importe) <= 0) return setVentaError('Introduce un importe válido.');
-              setVentaError('');
-              
+
               const combinedServiceNames = serviciosSeleccionados.map(s => s.name).join(', ');
-              
-              addVenta({
+              const candidate = {
                 ...ventaForm,
                 clienteNombre: sanitizeText(ventaForm.clienteNombre),
-                clienteEmail: sanitizeText(ventaForm.clienteEmail),
+                clienteEmail: sanitizeText(ventaForm.clienteEmail || ''),
                 servicio: combinedServiceNames,
-                importe: parseFloat(ventaForm.importe),
+                importe: ventaForm.importe,
+              };
+
+              const { ok, data, errors } = validate(ventaSchema, candidate);
+              if (!ok) {
+                const firstError = errors.clienteNombre || errors.clienteEmail || errors.clienteTelefono || errors.importe || 'Revisa los datos del formulario';
+                return setVentaError(firstError);
+              }
+              setVentaError('');
+
+              addVenta({
+                ...ventaForm,
+                ...data,
                 moneda: 'USD',
               }).then(res => {
                 if (res && res.success) {

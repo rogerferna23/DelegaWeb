@@ -3,8 +3,12 @@ import { supabase } from '../lib/supabase';
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
+// Tama\u00F1o de lote para carga progresiva.
+const PAGE_SIZE = 500;
+
 export function useGastos() {
   const [gastos, setGastos] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Map Supabase snake_case/types to UI expectations
   const mapSupabaseToGasto = (row) => ({
@@ -15,18 +19,36 @@ export function useGastos() {
   });
 
   useEffect(() => {
-    // 1. Initial fetch
-    const fetchGastos = async () => {
-      const { data, error } = await supabase
-        .from('gastos')
-        .select('*')
-        .order('date', { ascending: true }); // sort chronologically
+    let cancelled = false;
 
-      if (!error && data) {
-        setGastos(data.map(mapSupabaseToGasto));
+    // Carga progresiva por lotes. Ver comentarios en useVentas.js.
+    const fetchGastosPaginated = async () => {
+      setLoading(true);
+      let from = 0;
+      const accumulated = [];
+
+      while (!cancelled) {
+        const { data, error } = await supabase
+          .from('gastos')
+          .select('*')
+          .order('date', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error || !data) break;
+
+        const mapped = data.map(mapSupabaseToGasto);
+        accumulated.push(...mapped);
+        // Actualizamos progresivamente para que la UI responda antes de terminar.
+        setGastos([...accumulated]);
+
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
       }
+
+      if (!cancelled) setLoading(false);
     };
-    fetchGastos();
+
+    fetchGastosPaginated();
 
     // 2. Realtime subscription (mirrors useVentas)
     const subscription = supabase
@@ -46,6 +68,7 @@ export function useGastos() {
       .subscribe();
 
     return () => {
+      cancelled = true;
       supabase.removeChannel(subscription);
     };
   }, []);

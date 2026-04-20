@@ -45,7 +45,6 @@ export const sendSaleNotification = async (venta, type = 'manual') => {
       EMAIL_CONFIG.PUBLIC_KEY
     );
 
-    console.log('[EmailService] Notificación enviada:', response.status, response.text);
     return { success: true, response };
   } catch (error) {
     console.error('[EmailService] Error al enviar notificación:', error);

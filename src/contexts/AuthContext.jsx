@@ -139,39 +139,13 @@ export function AuthProvider({ children }) {
     };
   }, [applySession]);
 
-  // --- Inactivity Monitoring (15 minutes) ---
-  useEffect(() => {
-    if (!currentUser) return;
-
-    let inactivityTimer;
-    const INACTIVITY_LIMIT = 15 * 60 * 1000; // 15 minutos en ms
-
-    const resetTimer = () => {
-      if (inactivityTimer) clearTimeout(inactivityTimer);
-      inactivityTimer = setTimeout(() => {
-        console.warn("Cerrando sesión por inactividad (15 min)");
-        logout();
-        alert("Tu sesión ha expirado por inactividad. Por favor, inicia sesión de nuevo.");
-      }, INACTIVITY_LIMIT);
-    };
-
-    // Eventos que resetean el temporizador
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    events.forEach(name => document.addEventListener(name, resetTimer));
-
-    resetTimer(); // Iniciar temporizador al montar/loguear
-
-    return () => {
-      if (inactivityTimer) clearTimeout(inactivityTimer);
-      events.forEach(name => document.removeEventListener(name, resetTimer));
-    };
-  }, [currentUser]);
+  // El cierre de sesión por inactividad se centraliza en useInactivityTimer,
+  // que está montado dentro de AdminLayout y muestra una advertencia con
+  // cuenta regresiva antes de cerrar sesión. Aquí no duplicamos esa lógica.
 
   const login = async (email, password) => {
     try {
-      console.log('Iniciando direct signInWithPassword...');
-      
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 25000)
       );
 
@@ -183,8 +157,6 @@ export function AuthProvider({ children }) {
         throw new Error('NETWORK_ERROR');
       });
 
-      console.log('signInWithPassword terminado', { error, userId: data?.user?.id });
-
       if (error) {
         return { success: false, error: 'Credenciales inválidas.' };
       }
@@ -193,13 +165,21 @@ export function AuthProvider({ children }) {
       if (!user) throw new Error('SESSION_MISSING');
 
       // MFA check — wrapped in timeout + try/catch so a hanging Supabase call
-      // never blocks login. Fails OPEN: if the check hangs or errors, user gets in.
+      // never blocks login indefinitely. FAIL CLOSED: si el check falla o se agota el
+      // tiempo, rechazamos el acceso antes de aplicar la sesión. Mejor que el usuario
+      // reintente a que alguien entre saltándose el segundo factor.
+      const MFA_TIMEOUT_MS = 10000;
+      const MFA_CHECK_FAILED = Symbol('mfa_check_failed');
+
+      let mfaResult;
       try {
         const mfaCheckPromise = (async () => {
-          const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (aalError) throw aalError;
 
           if (aalData?.nextLevel === 'aal2' && aalData?.currentLevel === 'aal1') {
-            const { data: factorsData } = await supabase.auth.mfa.listFactors();
+            const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
+            if (factorsError) throw factorsError;
             // Only VERIFIED factors require MFA — cancelled/unverified enrollments are ignored
             const totpFactor = factorsData?.totp?.find(f => f.status === 'verified');
             if (totpFactor) return { mfaRequired: true, factorId: totpFactor.id };
@@ -207,19 +187,28 @@ export function AuthProvider({ children }) {
           return { mfaRequired: false };
         })();
 
-        const mfaResult = await Promise.race([
+        mfaResult = await Promise.race([
           mfaCheckPromise,
-          new Promise(resolve => setTimeout(() => resolve({ mfaRequired: false }), 10000)),
+          new Promise(resolve => setTimeout(() => resolve(MFA_CHECK_FAILED), MFA_TIMEOUT_MS)),
         ]);
-
-        if (mfaResult.mfaRequired) {
-          return { success: true, mfaRequired: true, factorId: mfaResult.factorId };
-        }
-      } catch {
-        // MFA check failed — fail open, let the user in
-        console.warn('MFA check failed or timed out, proceeding without MFA.');
+      } catch (mfaErr) {
+        console.error('MFA check error:', mfaErr?.message || mfaErr);
+        mfaResult = MFA_CHECK_FAILED;
       }
 
+      if (mfaResult === MFA_CHECK_FAILED) {
+        // No pudimos verificar si este usuario tiene MFA activo. Cerramos la sesión
+        // y pedimos reintentar para no conceder acceso sin el segundo factor.
+        try { await supabase.auth.signOut(); } catch { /* noop */ }
+        return {
+          success: false,
+          error: 'No se pudo verificar el segundo factor. Por favor, intenta nuevamente en unos segundos.',
+        };
+      }
+
+      if (mfaResult.mfaRequired) {
+        return { success: true, mfaRequired: true, factorId: mfaResult.factorId };
+      }
 
       await applySession(user);
       return { success: true };

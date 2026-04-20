@@ -1,7 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Bot, X, Send, Sparkles, BarChart2, MessageSquare, Target, Zap, Brain, Loader2 } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { supabase } from '../../lib/supabase';
+
+// Sanitiza un mensaje del chat permitiendo solo <strong> y <br>, tras aplicar markdown mínimo.
+const renderMessage = (content) => {
+  const withFormatting = String(content ?? '')
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
+    .replace(/\n/g, '<br/>');
+  return DOMPurify.sanitize(withFormatting, {
+    ALLOWED_TAGS: ['strong', 'br'],
+    ALLOWED_ATTR: ['class'],
+  });
+};
 
 export default function AIChatPanel({ isVisible, setVisible }) {
   const [messages, setMessages] = useState([
@@ -138,8 +150,8 @@ export default function AIChatPanel({ isVisible, setVisible }) {
           
           {messages.map((msg, index) => (
             <div key={index} className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              <div 
-                dangerouslySetInnerHTML={{__html: msg.content.replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>').replace(/\n/g, '<br/>')}} 
+              <div
+                dangerouslySetInnerHTML={{ __html: renderMessage(msg.content) }}
                 className={`p-3.5 rounded-2xl text-[12px] shadow-sm max-w-[90%] leading-relaxed ${
                 msg.role === 'user' 
                   ? 'bg-primary/90 text-white rounded-tr-sm'

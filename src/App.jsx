@@ -47,7 +47,6 @@ const Seguridad = lazy(() => import('./admin/pages/Seguridad'))
 // Protected Route and Context (Keep static as they are small auth/logic wrappers)
 import ProtectedRoute from './admin/ProtectedRoute'
 import { AdminDataProvider } from './admin/AdminDataContext'
-import { useInactivityLogout } from './hooks/useInactivityLogout'
 
 function PublicSite() {
   return (
@@ -73,7 +72,8 @@ const PageLoader = () => (
 )
 
 function App() {
-  useInactivityLogout();
+  // El timer de inactividad se monta dentro de AdminLayout
+  // (ver useInactivityTimer) para que solo aplique al panel admin.
   return (
     <>
       <ScrollToTop />

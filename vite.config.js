@@ -12,6 +12,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  esbuild: {
+    // En builds de producción se eliminan los console.* y debugger.
+    // console.error y console.warn se conservan para poder diagnosticar problemas reales.
+    drop: ['debugger'],
+    pure: ['console.log', 'console.info', 'console.debug', 'console.trace'],
+  },
   server: {
     headers: {
       'Content-Security-Policy': [

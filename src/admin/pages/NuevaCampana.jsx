@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { 
-  ArrowRight, ArrowLeft, Target, Users, 
-  Image as ImageIcon, Rocket, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  ArrowRight, ArrowLeft, Target, Users,
+  Image as ImageIcon, Rocket,
   Copy, ExternalLink, Save, CheckCircle2,
-  Briefcase, 
+  Briefcase,
   MessageSquare, ShoppingCart, Mail, PlusSquare,
-  Loader2
+  Loader2, Trash2,
+  LayoutTemplate, Sparkles, Globe, Info
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
@@ -14,6 +15,59 @@ import { getCsrfToken } from '../../utils/csrf';
 import { sanitize } from '../../utils/sanitize';
 import { buildCampaignPrompt } from '../components/campaigns/CampaignPromptBuilder';
 
+// Clave de borrador en localStorage. La versionamos por si el shape
+// del formulario cambia a futuro y necesitamos invalidar drafts viejos.
+const DRAFT_STORAGE_KEY = 'delegaweb:nuevacampana:draft:v1';
+const DRAFT_DEBOUNCE_MS = 500;
+
+const INITIAL_FORM_DATA = {
+  // Perfil de Negocio (Paso 1)
+  business_profile_id: null,
+  company_name: '',
+  offer: '',
+  ideal_client: '',
+  differentiator: '',
+  price_range: '',
+  sales_method: '',
+
+  // Configuración (Paso 2)
+  name: '',
+  objective: 'Interacción (Mensajes a WhatsApp)',
+  daily_budget: 10,
+
+  // Audiencia (Paso 3)
+  audience_age_min: 18,
+  audience_age_max: 65,
+  locations: ['México', 'Colombia', 'Perú'],
+  interests: [],
+  gender: 'Todos',
+
+  // Creativo (Paso 4)
+  primary_text: '',
+  headline: '',
+  description: '',
+  cta: 'Enviar mensaje'
+};
+
+// Determina si un draft es "no trivial" (tiene algún campo significativo)
+// para evitar mostrar "Borrador guardado" cuando el usuario aún no tocó nada.
+const isMeaningfulDraft = (data) => {
+  if (!data) return false;
+  return Boolean(
+    data.company_name?.trim() ||
+    data.offer?.trim() ||
+    data.ideal_client?.trim() ||
+    data.differentiator?.trim() ||
+    data.price_range ||
+    data.sales_method ||
+    data.name?.trim() ||
+    (data.interests && data.interests.length > 0) ||
+    data.primary_text?.trim() ||
+    data.headline?.trim() ||
+    data.description?.trim()
+  );
+};
+
 export default function NuevaCampana() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -21,36 +75,15 @@ export default function NuevaCampana() {
   const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
   const [implementationGuideText, setImplementationGuideText] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
-  
+
+  // Estado de borrador (persistencia localStorage)
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const hasHydratedRef = useRef(false);
+  const debounceTimerRef = useRef(null);
+
   // States del formulario
-  const [formData, setFormData] = useState({
-    // Perfil de Negocio (Paso 1)
-    business_profile_id: null,
-    company_name: '',
-    offer: '',
-    ideal_client: '',
-    differentiator: '',
-    price_range: '',
-    sales_method: '',
-    
-    // Configuración (Paso 2)
-    name: '',
-    objective: 'Interacción (Mensajes a WhatsApp)',
-    daily_budget: 10,
-    
-    // Audiencia (Paso 3)
-    audience_age_min: 18,
-    audience_age_max: 65,
-    locations: ['México', 'Colombia', 'Perú'],
-    interests: [],
-    gender: 'Todos',
-    
-    // Creativo (Paso 4)
-    primary_text: '',
-    headline: '',
-    description: '',
-    cta: 'Enviar mensaje'
-  });
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
 
   const [profiles, setProfiles] = useState([]);
   const [isLoadingProfiles, setIsLoadingProfiles] = useState(true);
@@ -61,6 +94,82 @@ export default function NuevaCampana() {
   React.useEffect(() => {
     fetchProfiles();
   }, []);
+
+  // Rehidratar borrador desde localStorage al montar.
+  // Solo una vez: corremos antes del autosave para no sobreescribir el draft
+  // con el estado inicial vacío.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.formData && isMeaningfulDraft(parsed.formData)) {
+          setFormData(prev => ({ ...prev, ...parsed.formData }));
+          if (typeof parsed.step === 'number' && parsed.step >= 1 && parsed.step <= 5) {
+            setStep(parsed.step);
+          }
+          setDraftSavedAt(parsed.savedAt || null);
+          setHasRestoredDraft(true);
+        }
+      }
+    } catch (err) {
+      // localStorage corrupto o no disponible (modo privado, quota llena) — ignorar.
+      console.warn('No se pudo leer el borrador de campaña:', err);
+    } finally {
+      hasHydratedRef.current = true;
+    }
+  }, []);
+
+  // Autosave del borrador con debounce.
+  // Guardamos { formData, step, savedAt } cuando el usuario hace cambios.
+  useEffect(() => {
+    if (!hasHydratedRef.current) return; // Evita escribir antes de rehidratar.
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      try {
+        // No persistas el ID del perfil: si el usuario cambia de cuenta
+        // o elimina el perfil, el id quedaría colgado.
+        const { business_profile_id, ...formToPersist } = formData;
+        if (!isMeaningfulDraft(formToPersist)) {
+          // Si el formulario quedó vacío, limpia el borrador previo.
+          localStorage.removeItem(DRAFT_STORAGE_KEY);
+          setDraftSavedAt(null);
+          return;
+        }
+        const savedAt = new Date().toISOString();
+        localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({ formData: formToPersist, step, savedAt })
+        );
+        setDraftSavedAt(savedAt);
+      } catch (err) {
+        console.warn('No se pudo guardar el borrador de campaña:', err);
+      }
+    }, DRAFT_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [formData, step]);
+
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch { /* noop */ }
+    setDraftSavedAt(null);
+    setHasRestoredDraft(false);
+  };
+
+  const discardDraft = () => {
+    if (!confirm('¿Descartar el borrador guardado y empezar desde cero?')) return;
+    clearDraft();
+    setFormData(INITIAL_FORM_DATA);
+    setStep(1);
+  };
 
   const fetchProfiles = async () => {
     try {
@@ -287,6 +396,8 @@ export default function NuevaCampana() {
 
       if (error || data?.error) throw new Error(data?.error || error?.message);
 
+      // Campaña guardada correctamente — descartamos el borrador.
+      clearDraft();
       navigate('/admin/campanas');
     } catch (err) {
       console.error('Fallo en guardado seguro:', err);
@@ -304,11 +415,38 @@ export default function NuevaCampana() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-end">
+      <div className="flex justify-between items-end flex-wrap gap-3">
         <div>
           <h1 className="text-lg font-bold text-white mb-0.5 text-balance">Planificador de Campaña</h1>
           <p className="text-xs text-gray-400">Diseña tu estrategia y genera la guía para Meta Ads Manager</p>
         </div>
+        {(draftSavedAt || hasRestoredDraft) && (
+          <div className="flex items-center gap-2">
+            {hasRestoredDraft && (
+              <span className="text-[10px] px-2 py-1 rounded-md bg-teal-500/10 border border-teal-500/20 text-teal-300 font-medium">
+                ✨ Borrador restaurado
+              </span>
+            )}
+            {draftSavedAt && (
+              <span
+                className="text-[10px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-gray-400 font-medium flex items-center gap-1"
+                title={`Guardado automáticamente: ${new Date(draftSavedAt).toLocaleString()}`}
+              >
+                <Save className="w-3 h-3" />
+                Borrador guardado
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="text-[10px] px-2 py-1 rounded-md bg-white/5 border border-white/10 text-gray-400 hover:text-red-300 hover:border-red-400/30 font-medium flex items-center gap-1 transition-colors"
+              title="Descartar el borrador y empezar desde cero"
+            >
+              <Trash2 className="w-3 h-3" />
+              Descartar
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Stepper Header */}

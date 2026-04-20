@@ -1,12 +1,14 @@
 import React, { useEffect } from 'react';
 import Navbar from './Navbar';
 import Footer from './Footer';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { validate, postulanteSchema } from '../schemas/forms.schema';
 
 const CloserProgram = () => {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
+  const [formError, setFormError] = React.useState('');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -14,23 +16,37 @@ const CloserProgram = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    
+    setFormError('');
+
     const formData = new FormData(e.target);
-    const data = {
-      full_name: formData.get('fullName'),
+    const candidate = {
+      nombre: formData.get('fullName'),
       email: formData.get('email'),
-      whatsapp: formData.get('whatsapp'),
-      nationality: formData.get('nationality'),
+      telefono: formData.get('whatsapp'),
+    };
+
+    const { ok, data, errors } = validate(postulanteSchema.pick({ nombre: true, email: true, telefono: true }), candidate);
+    if (!ok) {
+      setFormError(errors.nombre || errors.email || errors.telefono || 'Revisa los datos del formulario');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const payload = {
+      full_name: data.nombre,
+      email: data.email,
+      whatsapp: data.telefono,
+      nationality: formData.get('nationality') || null,
     };
 
     try {
-      const { error } = await supabase.from('postulantes').insert([data]);
+      const { error } = await supabase.from('postulantes').insert([payload]);
       if (error) throw error;
       setSubmitted(true);
     } catch (error) {
       console.error('Error submitting application:', error);
-      alert('Hubo un error al enviar tu solicitud. Por favor, inténtalo de nuevo.');
+      setFormError('Hubo un error al enviar tu solicitud. Por favor, intenta de nuevo.');
     } finally {
       setIsSubmitting(false);
     }
@@ -207,8 +223,15 @@ const CloserProgram = () => {
                     </div>
                   </div>
 
+                  {formError && (
+                    <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+
                   <div className="pt-4">
-                    <button 
+                    <button
                       type="submit"
                       disabled={isSubmitting}
                       className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-xl shadow-lg shadow-primary/20 transform active:scale-95 transition-all duration-200 uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed text-sm"

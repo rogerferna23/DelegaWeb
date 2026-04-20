@@ -3,6 +3,7 @@ import { PayPalButtons } from '@paypal/react-paypal-js';
 import { X, CheckCircle, AlertCircle, ShieldCheck, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { sendSaleNotification } from '../services/emailService';
+import { validate, checkoutSchema } from '../schemas/forms.schema';
 
 // ─── Replace with your PayPal Client ID ──────────────────────────────────────
 // Get it free at: https://developer.paypal.com → My Apps → Create App
@@ -52,6 +53,7 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
   const [priority, setPriority] = useState(false);
   const [dbSyncError, setDbSyncError] = useState(false);
   const [orderDetails, setOrderDetails] = useState(null);
+  const [formError, setFormError] = useState('');
 
   // Form Fields
   const [payerPhone, setPayerPhone] = useState('');
@@ -278,6 +280,14 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
             </div>
           )}
 
+          {/* Error de validación del formulario */}
+          {formError && status !== 'success' && status !== 'error' && (
+            <div className="mb-3 flex items-center gap-1.5 text-[11px] text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
           {/* PayPal buttons */}
           {status !== 'success' && status !== 'error' && (
             <div className="relative z-[10]">
@@ -285,14 +295,27 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
                 style={{ layout: 'vertical', color: 'gold', shape: 'rect', label: 'pay', height: 44 }}
                 disabled={status === 'processing'}
                 forceReRender={[finalPrice, currency, priority]}
-                createOrder={(_, actions) => actions.order.create({
-                  purchase_units: [{
-                    description: priority
-                      ? `DelegaWeb Compra Múltiple — Entrega prioritaria`
-                      : `DelegaWeb Compra`,
-                    amount: { value: finalPrice, currency_code: currency },
-                  }],
-                })}
+                createOrder={(_, actions) => {
+                  // Validamos tel\u00E9fono y campa\u00F1a antes de crear la orden de PayPal.
+                  // El nombre/email los rellena PayPal en onApprove.
+                  const { ok, errors } = validate(
+                    checkoutSchema.pick({ telefono: true, campana: true }),
+                    { telefono: payerPhone, campana: campaignSource }
+                  );
+                  if (!ok) {
+                    setFormError(errors.telefono || errors.campana || 'Revisa los datos');
+                    throw new Error(errors.telefono || errors.campana || 'INVALID_FORM');
+                  }
+                  setFormError('');
+                  return actions.order.create({
+                    purchase_units: [{
+                      description: priority
+                        ? `DelegaWeb Compra M\u00FAltiple \u2014 Entrega prioritaria`
+                        : `DelegaWeb Compra`,
+                      amount: { value: finalPrice, currency_code: currency },
+                    }],
+                  });
+                }}
                 onApprove={async (_, actions) => {
                   setStatus('processing');
                   try {

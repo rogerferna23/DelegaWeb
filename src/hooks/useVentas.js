@@ -2,8 +2,13 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { sendSaleNotification } from '../services/emailService';
 
+// Tamaño de lote para cargar ventas sin bloquear el navegador.
+// La UI va mostrando datos conforme llegan; útil cuando hay muchos registros.
+const PAGE_SIZE = 500;
+
 export function useVentas() {
   const [ventas, setVentas] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   // Helper function to map from Supabase snake_case to UI camelCase expected structure
   const mapSupabaseToVenta = (row) => ({
@@ -21,20 +26,37 @@ export function useVentas() {
   });
 
   useEffect(() => {
-    // 1. Fetch sales initially
-    const fetchVentas = async () => {
-      const { data, error } = await supabase
-        .from('ventas')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (!error && data) {
-        setVentas(data.map(mapSupabaseToVenta));
-      }
-    };
-    fetchVentas();
+    let cancelled = false;
 
-    // 2. Subscribe to new, updated or deleted sales automatically (Realtime)
+    // Carga progresiva por lotes. En vez de traer miles de filas en una sola
+    // query, traemos PAGE_SIZE a la vez y vamos concatenando. Así la UI
+    // muestra las primeras ventas casi al instante.
+    const fetchVentasPaginated = async () => {
+      setLoading(true);
+      let from = 0;
+
+      while (!cancelled) {
+        const { data, error } = await supabase
+          .from('ventas')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE_SIZE - 1);
+
+        if (error || !data) break;
+
+        const mapped = data.map(mapSupabaseToVenta);
+        setVentas(prev => (from === 0 ? mapped : [...prev, ...mapped]));
+
+        if (data.length < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
+
+      if (!cancelled) setLoading(false);
+    };
+
+    fetchVentasPaginated();
+
+    // Realtime: insert/update/delete se aplican al array en memoria.
     const subscription = supabase
       .channel('ventas_channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ventas' }, (payload) => {
@@ -49,6 +71,7 @@ export function useVentas() {
       .subscribe();
 
     return () => {
+      cancelled = true;
       supabase.removeChannel(subscription);
     };
   }, []);
@@ -70,7 +93,7 @@ export function useVentas() {
       estado: 'pendiente',
       ...(fechaTimestamp ? { created_at: fechaTimestamp } : {})
     }).select().single();
-    
+
     // We don't manually setVentas because the realtime subscription will catch the INSERT and add it.
     if (error) {
       console.error('Error adding venta:', error);
@@ -100,5 +123,5 @@ export function useVentas() {
     .filter(v => v.estado === 'pagado')
     .reduce((sum, v) => sum + (v.importe || 0), 0);
 
-  return { ventas, addVenta, removeVenta, approveVenta, totalVentas };
+  return { ventas, loading, addVenta, removeVenta, approveVenta, totalVentas };
 }
