@@ -14,6 +14,7 @@ import GeneradorCopyAI from '../components/GeneradorCopyAI';
 import { getCsrfToken } from '../../utils/csrf';
 import { sanitize } from '../../utils/sanitize';
 import { buildCampaignPrompt } from '../components/campaigns/CampaignPromptBuilder';
+import { useJob } from '../../contexts/BackgroundJobsContext';
 
 // Clave de borrador en localStorage. La versionamos por si el shape
 // del formulario cambia a futuro y necesitamos invalidar drafts viejos.
@@ -71,10 +72,15 @@ const isMeaningfulDraft = (data) => {
 export default function NuevaCampana() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [isGuideGenerated, setIsGuideGenerated] = useState(false);
-  const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
-  const [implementationGuideText, setImplementationGuideText] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
+
+  // Job global para la generación de la guía de implementación.
+  // Así, si el usuario navega a otra sección mientras genera, el resultado
+  // sigue disponible cuando vuelva — no se pierde.
+  const guideJob = useJob('nuevacampana:generate-guide');
+  const isGeneratingGuide = guideJob.isRunning;
+  const isGuideGenerated = guideJob.isSuccess;
+  const implementationGuideText = guideJob.result || '';
 
   // Estado de borrador (persistencia localStorage)
   const [draftSavedAt, setDraftSavedAt] = useState(null);
@@ -343,28 +349,25 @@ export default function NuevaCampana() {
   };
 
   const generateGuide = async () => {
+    // El job se ejecuta en el BackgroundJobsContext (nivel root), así que
+    // sigue vivo aunque el usuario navegue a otra sección del sidebar.
     try {
-      setIsGeneratingGuide(true);
-      
-      const prompt = buildCampaignPrompt(formData);
-
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: { 
-          message: prompt,
-          is_copy_generation: false 
-        }
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      setImplementationGuideText(data.result || 'No se pudo generar la guía. Intenta de nuevo.');
-      setIsGuideGenerated(true);
+      await guideJob.start(
+        async () => {
+          const prompt = buildCampaignPrompt(formData);
+          const { data, error } = await supabase.functions.invoke('ai-chat', {
+            body: { message: prompt, is_copy_generation: false },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          return data.result || 'No se pudo generar la guía. Intenta de nuevo.';
+        },
+        { label: `Guía de campaña: ${formData.company_name || 'Sin nombre'}` }
+      );
     } catch (err) {
       console.error('Error generando guía:', err);
+      // El error ya quedó almacenado en el job — lo mostramos al usuario.
       alert(`Error al generar la guía: ${err.message || 'Error de conexión'}`);
-    } finally {
-      setIsGeneratingGuide(false);
     }
   };
 
@@ -396,8 +399,9 @@ export default function NuevaCampana() {
 
       if (error || data?.error) throw new Error(data?.error || error?.message);
 
-      // Campaña guardada correctamente — descartamos el borrador.
+      // Campaña guardada correctamente — descartamos el borrador y el job de guía.
       clearDraft();
+      guideJob.clear();
       navigate('/admin/campanas');
     } catch (err) {
       console.error('Fallo en guardado seguro:', err);

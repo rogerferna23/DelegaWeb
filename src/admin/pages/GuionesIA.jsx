@@ -11,6 +11,7 @@ import { CopyButton, VideoResultView, CarouselResultView, OptimizacionResultView
 import GuionesHistoryView from '../components/guiones/GuionesHistoryView';
 import { buildGuionPrompt } from '../components/guiones/GuionPromptBuilder';
 import { generarGuionDocx } from '../utils/generarGuionDocx';
+import { useJob } from '../../contexts/BackgroundJobsContext';
 
 export default function GuionesIA() {
   const [activeTab, setActiveTab] = useState('generar'); // 'generar' | 'historial'
@@ -22,11 +23,25 @@ export default function GuionesIA() {
   const [textoAOptimizar, setTextoAOptimizar] = useState('');
   const [objetivoOptimizacion, setObjetivoOptimizacion] = useState('venta');
 
-  // Estado del generador
-  const [isGenerating, setIsGenerating] = useState(false);
+  // Estado del generador.
+  // La generación de guión va por el BackgroundJobsContext para que sobreviva
+  // a cambios de ruta: el usuario puede navegar mientras espera los 8-15s.
+  const guionJob = useJob('guiones-ia:generar');
+  const isGenerating = guionJob.isRunning;
+  const jobErrorMsg = guionJob.error || null;
+
+  // Estado local SOLO para cuando el usuario abre un guión viejo desde el
+  // historial (eso no pasa por el job, es una lectura directa de la DB).
+  const [historyView, setHistoryView] = useState(null);
+
+  // resultData: primero lo que el usuario abrió del historial, si no, el del job.
+  const resultData = historyView || guionJob.result || null;
+
   const [isDownloading, setIsDownloading] = useState(false);
-  const [resultData, setResultData] = useState(null);
-  const [errorMsg, setErrorMsg] = useState(null);
+  const [errorMsgLocal, setErrorMsgLocal] = useState(null);
+  // Mensaje de error combinado: prioridad al error del job, si existe.
+  const errorMsg = errorMsgLocal || jobErrorMsg;
+  const setErrorMsg = setErrorMsgLocal;
   
   // Estado para ver un guión desde historial
   const [guionEnVista, setGuionEnVista] = useState(null);
@@ -149,76 +164,84 @@ export default function GuionesIA() {
   const handleGenTypeClick = (type) => {
     setGenerarType(type);
     setEstructura(null);
-    setResultData(null);
+    setHistoryView(null);
+    guionJob.clear();
   };
 
   const handleGenerar = async () => {
     if (!formData.nombre || !formData.servicio) return setErrorMsg('Faltan datos del negocio (Paso 1).');
     if (generarType !== 'optimizar' && !estructura) return setErrorMsg('Selecciona una estructura (Paso 3).');
     if (generarType === 'optimizar' && !textoAOptimizar) return setErrorMsg('Ingresa el texto a optimizar.');
-    
+
     setErrorMsg(null);
-    setIsGenerating(true);
-    setResultData(null);
 
+    // La generación se delega al BackgroundJobsContext (vive a nivel root).
+    // El usuario puede irse a Reportes mientras la IA trabaja; al volver
+    // encuentra el resultado esperándolo.
     try {
-      const { systemPrompt, userPrompt } = buildGuionPrompt(
-        formData, 
-        generarType, 
-        estructura, 
-        tono, 
-        textoAOptimizar,
-        objetivoOptimizacion
+      await guionJob.start(
+        async () => {
+          const { systemPrompt, userPrompt } = buildGuionPrompt(
+            formData,
+            generarType,
+            estructura,
+            tono,
+            textoAOptimizar,
+            objetivoOptimizacion
+          );
+
+          const { data, error } = await supabase.functions.invoke('generate-ai-guion', {
+            body: { systemPrompt, userPrompt },
+          });
+
+          if (error) throw error;
+          if (!data || !data.result) throw new Error('Respuesta de IA vacía.');
+
+          let parsedResponse;
+          try {
+            parsedResponse = JSON.parse(data.result);
+          } catch (errParse) {
+            console.error('Parsed failed, raw:', data.result, 'Error:', errParse);
+            throw new Error('La IA no devolvió un formato válido.');
+          }
+
+          // Guardar en DB (no-blocking para el resultado — si falla, igual devolvemos el guión).
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              let ganchoPreview = '';
+              if (parsedResponse.gancho) ganchoPreview = parsedResponse.gancho;
+              else if (parsedResponse.carrusel_optimizado?.titulo_carrusel) ganchoPreview = parsedResponse.carrusel_optimizado.titulo_carrusel;
+              else if (parsedResponse.guion_optimizado?.gancho) ganchoPreview = parsedResponse.guion_optimizado.gancho;
+              else if (parsedResponse.titulo_carrusel) ganchoPreview = parsedResponse.titulo_carrusel;
+
+              await supabase.from('guiones_historial').insert({
+                user_id: user.id,
+                tipo: generarType,
+                estructura: generarType === 'optimizar' ? objetivoOptimizacion : estructura,
+                tono: tono,
+                negocio_nombre: formData.nombre,
+                servicio: formData.servicio,
+                cliente_ideal: formData.cliente,
+                problema: formData.problema,
+                resultado: formData.resultado,
+                guion_json: parsedResponse,
+                gancho_preview: ganchoPreview ? ganchoPreview.substring(0, 100) + '...' : '',
+                es_optimizado: generarType === 'optimizar',
+                guion_original: textoAOptimizar,
+              });
+            }
+          } catch (dbErr) {
+            console.warn('No se pudo guardar el guión en historial:', dbErr);
+          }
+
+          return parsedResponse;
+        },
+        { label: `Guión IA: ${formData.servicio || 'Sin servicio'} (${generarType})` }
       );
-
-      const { data, error } = await supabase.functions.invoke('generate-ai-guion', {
-        body: { systemPrompt, userPrompt }
-      });
-
-      if (error) throw error;
-      if (!data || !data.result) throw new Error("Respuesta de IA vacía.");
-
-      // Parse JSON
-      let parsedResponse;
-      try {
-        parsedResponse = JSON.parse(data.result);
-      } catch (errParse) {
-        console.error("Parsed failed, raw:", data.result, "Error:", errParse);
-        throw new Error("La IA no devolvió un formato válido.");
-      }
-
-      setResultData(parsedResponse);
-
-      // Guardar en DB
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        let ganchoPreview = '';
-        if (parsedResponse.gancho) ganchoPreview = parsedResponse.gancho;
-        else if (parsedResponse.carrusel_optimizado?.titulo_carrusel) ganchoPreview = parsedResponse.carrusel_optimizado.titulo_carrusel;
-        else if (parsedResponse.guion_optimizado?.gancho) ganchoPreview = parsedResponse.guion_optimizado.gancho;
-        else if (parsedResponse.titulo_carrusel) ganchoPreview = parsedResponse.titulo_carrusel;
-
-        await supabase.from('guiones_historial').insert({
-          user_id: user.id,
-          tipo: generarType,
-          estructura: generarType === 'optimizar' ? objetivoOptimizacion : estructura,
-          tono: tono,
-          negocio_nombre: formData.nombre,
-          servicio: formData.servicio,
-          cliente_ideal: formData.cliente,
-          problema: formData.problema,
-          resultado: formData.resultado,
-          guion_json: parsedResponse,
-          gancho_preview: ganchoPreview ? ganchoPreview.substring(0, 100) + '...' : '',
-          es_optimizado: generarType === 'optimizar',
-          guion_original: textoAOptimizar
-        });
-      }
-
     } catch (err) {
-      setErrorMsg(err.message || 'Error de conexión con la IA.');
-    } finally {
-      setIsGenerating(false);
+      // El error ya queda en el job (aparece en jobErrorMsg).
+      console.error('Error generando guión:', err);
     }
   };
 
@@ -237,7 +260,9 @@ export default function GuionesIA() {
 
   const verDesdeHistorial = (guion) => {
     setActiveTab('generar');
-    setResultData(guion.guion_json);
+    // Al abrir desde historial, limpiamos el job activo y usamos el estado local.
+    guionJob.clear();
+    setHistoryView(guion.guion_json);
     setGenerarType(guion.tipo);
     setGuionEnVista(guion);
   };
@@ -299,7 +324,7 @@ export default function GuionesIA() {
 
         <div className="flex items-center bg-black/40 p-1.5 rounded-xl border border-white/5">
           <button
-            onClick={() => { setActiveTab('generar'); setGuionEnVista(null); if(guionEnVista) setResultData(null); }}
+            onClick={() => { setActiveTab('generar'); setGuionEnVista(null); if(guionEnVista) { setHistoryView(null); guionJob.clear(); } }}
             className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${
               activeTab === 'generar' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'
             }`}

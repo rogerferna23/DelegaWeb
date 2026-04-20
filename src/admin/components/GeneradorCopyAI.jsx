@@ -1,20 +1,22 @@
 import React, { useState } from 'react';
 import { Sparkles, Minus, Plus, Search, CheckCircle2, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { useJob } from '../../contexts/BackgroundJobsContext';
 
 export default function GeneradorCopyAI({ onSelectCopy, context }) {
 
   const [count, setCount] = useState(3);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [results, setResults] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
 
-  const handleGenerate = async () => {
-    try {
-      setIsGenerating(true);
-      setResults(null);
+  // El generador de copy vive dentro del wizard de NuevaCampana. Si el usuario
+  // navega a otra sección mientras la IA redacta las variaciones, el job sigue
+  // vivo y, al volver, los textos ya están listos para elegir.
+  const copyJob = useJob('nuevacampana:generador-copy');
+  const isGenerating = copyJob.isRunning;
+  const results = copyJob.result || null;
 
-      const prompt = `Actúa como un experto en Copywriting para Meta Ads.
+  const handleGenerate = async () => {
+    const prompt = `Actúa como un experto en Copywriting para Meta Ads.
 Genera ${count} variaciones de copy para una campaña de anuncios.
 CONTEXTO DEL NEGOCIO:
 - Empresa/Producto: ${context?.offer || 'Servicios profesionales'}
@@ -30,52 +32,50 @@ REQUERIMIENTOS:
 
 NO incluyas explicaciones, solo el JSON.`;
 
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: { 
-          message: prompt,
-          is_copy_generation: true
-        }
-      });
+    try {
+      await copyJob.start(
+        async () => {
+          const { data, error } = await supabase.functions.invoke('ai-chat', {
+            body: { message: prompt, is_copy_generation: true },
+          });
 
-      if (error) {
-        console.error('Error invocando Edge Function:', error);
-        // Si el error tiene respuesta de texto, intentamos leerlo
-        let detailedError = error.message;
-        if (error.context && typeof error.context.text === 'function') {
-           const text = await error.context.text();
-           detailedError = `${error.message}: ${text}`;
-        }
-        throw new Error(`Error de conexión con la IA: ${detailedError}`);
-      }
+          if (error) {
+            console.error('Error invocando Edge Function:', error);
+            let detailedError = error.message;
+            if (error.context && typeof error.context.text === 'function') {
+              const text = await error.context.text();
+              detailedError = `${error.message}: ${text}`;
+            }
+            throw new Error(`Error de conexión con la IA: ${detailedError}`);
+          }
 
-      if (data?.error) throw new Error(data.error);
-      if (!data || !data.message) throw new Error('La IA no devolvió ninguna respuesta.');
+          if (data?.error) throw new Error(data.error);
+          if (!data || !data.message) throw new Error('La IA no devolvió ninguna respuesta.');
 
-      let generated = [];
-      try {
-        if (typeof data.message === 'string') {
-          // Limpiar posible código markdown o texto extra
-          const jsonMatch = data.message.match(/\[[\s\S]*\]/);
-          const cleanJson = jsonMatch ? jsonMatch[0] : data.message;
-          generated = JSON.parse(cleanJson);
-        } else {
-          generated = data.message || [];
-        }
+          let generated = [];
+          try {
+            if (typeof data.message === 'string') {
+              const jsonMatch = data.message.match(/\[[\s\S]*\]/);
+              const cleanJson = jsonMatch ? jsonMatch[0] : data.message;
+              generated = JSON.parse(cleanJson);
+            } else {
+              generated = data.message || [];
+            }
+            if (!Array.isArray(generated)) {
+              generated = [generated];
+            }
+          } catch (parseErr) {
+            console.error('Error parseando JSON de IA:', parseErr, data.message);
+            throw new Error('El formato de respuesta de la IA no es válido. Prueba de nuevo.');
+          }
 
-        if (!Array.isArray(generated)) {
-          generated = [generated]; // Intentar convertir a array si vino un solo objeto
-        }
-      } catch (parseErr) {
-        console.error('Error parseando JSON de IA:', parseErr, data.message);
-        throw new Error('El formato de respuesta de la IA no es válido. Prueba de nuevo.');
-      }
-
-      setResults(generated);
+          return generated;
+        },
+        { label: `Copy IA: ${count} variaciones` }
+      );
     } catch (err) {
       console.error('Error completo en GeneradorCopyAI:', err);
-      alert(`${err.message || 'Hubo un error al generar los textos. Por favor intenta de nuevo.'}`);
-    } finally {
-      setIsGenerating(false);
+      // El error ya quedó en el job; lo mostrará el indicador global.
     }
   };
 
@@ -151,9 +151,9 @@ NO incluyas explicaciones, solo el JSON.`;
         <div className="mt-4 space-y-3">
           <div className="flex justify-between items-center mb-1">
             <span className="text-sm text-gray-300 font-medium">Variaciones generadas:</span>
-            <button 
+            <button
                type="button"
-               onClick={() => { setResults(null); setCount(3); }} 
+               onClick={() => { copyJob.clear(); setCount(3); setSelectedIndex(null); }}
                className="text-xs text-primary hover:text-orange-400"
             >
               Regenerar

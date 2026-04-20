@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { PayPalScriptProvider } from '@paypal/react-paypal-js'
 import { CartProvider } from './contexts/CartContext'
+import { BackgroundJobsProvider } from './contexts/BackgroundJobsContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { logFrontendError } from './utils/errorLogger'
 import { reloadIfChunkError, clearChunkReloadGuard } from './utils/chunkReload'
@@ -41,7 +42,9 @@ createRoot(document.getElementById('root')).render(
       <ErrorBoundary>
         <AuthProvider>
           <CartProvider>
-            <App />
+            <BackgroundJobsProvider>
+              <App />
+            </BackgroundJobsProvider>
           </CartProvider>
         </AuthProvider>
       </ErrorBoundary>

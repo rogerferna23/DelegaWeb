@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import SecurityBanner from './components/SecurityBanner';
+import BackgroundJobsIndicator from './components/BackgroundJobsIndicator';
 
 const navItems = [
   { label: 'Dashboard',     icon: LayoutDashboard, path: '/admin' },
@@ -384,6 +385,10 @@ export default function AdminLayout() {
           </div>
         </main>
       </div>
+
+      {/* Indicador global de procesos en segundo plano.
+          Persiste entre cambios de ruta porque vive fuera del <Outlet />. */}
+      <BackgroundJobsIndicator />
     </div>
   );
 }
