@@ -57,45 +57,57 @@ export default function BackgroundJobsIndicator() {
 
   return (
     <>
-      {/* Badge compacto: esquina inferior-derecha */}
+      {/* Badge compacto: encima del botón flotante del Asistente IA
+          (bottom-6 right-6, ~52px). Lo ponemos en bottom-24 right-6 para
+          que queden alineados verticalmente sin solaparse. */}
       {hasActivity && (
-        <div className="fixed bottom-4 right-4 z-40">
+        <div className="fixed bottom-24 right-6 z-[55]">
           {!expanded ? (
             <button
               onClick={() => setExpanded(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-full bg-cardbg border border-white/10 shadow-lg hover:border-primary/40 transition-all"
+              className="group flex items-center gap-2 pl-2.5 pr-3 py-1.5 rounded-full bg-cardbg/90 backdrop-blur-md border border-white/10 shadow-[0_8px_20px_-6px_rgba(0,0,0,0.5)] hover:border-primary/50 hover:bg-cardbg transition-all duration-200"
               title="Procesos en segundo plano"
             >
               {runningJobs.length > 0 ? (
                 <>
-                  <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
-                  <span className="text-[11px] font-medium text-white">
+                  <span className="relative flex items-center justify-center w-5 h-5">
+                    <span className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+                    <Loader2 className="w-3.5 h-3.5 text-primary animate-spin relative" />
+                  </span>
+                  <span className="text-[11px] font-medium text-white whitespace-nowrap">
                     {runningJobs.length} en curso
                   </span>
                 </>
               ) : (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
-                  <span className="text-[11px] font-medium text-white">
+                  <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-500/15">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+                  </span>
+                  <span className="text-[11px] font-medium text-white whitespace-nowrap">
                     {unseenFinishedJobs.length} listo{unseenFinishedJobs.length === 1 ? '' : 's'}
                   </span>
                 </>
               )}
             </button>
           ) : (
-            <div className="w-80 bg-cardbg border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-                <span className="text-[11px] font-bold text-white uppercase tracking-wide">
-                  Procesos
-                </span>
+            <div className="w-80 bg-cardbg/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5 bg-background/40">
+                <div className="flex items-center gap-2">
+                  {runningJobs.length > 0 && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  )}
+                  <span className="text-[11px] font-bold text-white uppercase tracking-wider">
+                    Procesos en segundo plano
+                  </span>
+                </div>
                 <button
                   onClick={() => setExpanded(false)}
-                  className="text-gray-500 hover:text-white transition-colors"
+                  className="text-gray-500 hover:text-white transition-colors p-1 hover:bg-white/5 rounded-lg"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <div className="max-h-72 overflow-y-auto">
+              <div className="max-h-72 overflow-y-auto scrollbar-hide">
                 {runningJobs.map((job) => (
                   <JobRow key={job.key} job={job} />
                 ))}
@@ -163,30 +175,39 @@ function JobRow({ job, onClear }) {
     ? Math.round((job.finishedAt - job.startedAt) / 1000)
     : Math.round((Date.now() - job.startedAt) / 1000);
 
+  const iconWrap =
+    job.status === 'running'
+      ? 'bg-primary/15'
+      : job.status === 'success'
+      ? 'bg-teal-500/15'
+      : 'bg-red-500/15';
+
   return (
-    <div className="px-4 py-2.5 border-b border-white/5 last:border-b-0 flex items-start gap-2.5">
-      {job.status === 'running' && (
-        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin mt-0.5 shrink-0" />
-      )}
-      {job.status === 'success' && (
-        <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 mt-0.5 shrink-0" />
-      )}
-      {job.status === 'error' && (
-        <XCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 shrink-0" />
-      )}
+    <div className="px-4 py-3 border-b border-white/5 last:border-b-0 flex items-start gap-3 hover:bg-white/[0.02] transition-colors">
+      <span className={`flex items-center justify-center w-6 h-6 rounded-full shrink-0 ${iconWrap}`}>
+        {job.status === 'running' && (
+          <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+        )}
+        {job.status === 'success' && (
+          <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+        )}
+        {job.status === 'error' && (
+          <XCircle className="w-3.5 h-3.5 text-red-400" />
+        )}
+      </span>
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-medium text-white truncate">{job.label}</p>
-        <p className="text-[9px] text-gray-500 mt-0.5">
+        <p className="text-[11px] font-medium text-white truncate leading-tight">{job.label}</p>
+        <p className="text-[9px] text-gray-500 mt-1 uppercase tracking-wider">
           {job.status === 'running' ? `En curso · ${elapsedSec}s` : `Duración ${elapsedSec}s`}
         </p>
         {job.error && (
-          <p className="text-[9px] text-red-300 mt-0.5 line-clamp-2">{job.error}</p>
+          <p className="text-[10px] text-red-300 mt-1 line-clamp-2 leading-snug">{job.error}</p>
         )}
       </div>
       {onClear && job.status !== 'running' && (
         <button
           onClick={onClear}
-          className="text-gray-500 hover:text-white transition-colors"
+          className="text-gray-500 hover:text-white transition-colors p-1 -m-1 hover:bg-white/5 rounded"
           title="Quitar de la lista"
         >
           <X className="w-3 h-3" />
