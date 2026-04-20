@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { 
+import {
   Sparkles, FileText, Clapperboard, Image as ImageIcon,
   Smartphone, Target, ShoppingCart, Brain, Star, Zap, Flame, Diamond,
   Map, BookOpen, Lightbulb, GraduationCap, MessageSquare, Ban, HelpCircle,
   TrendingUp, Puzzle, Wand2, Loader2, PenTool, LayoutTemplate, Volume2, Archive, Download,
-  Briefcase, Save, Trash2, Plus, Search, Sparkles as SparklesIcon
+  Briefcase, Save, Trash2, Plus, Search, Sparkles as SparklesIcon,
+  ClipboardCheck, ListOrdered, BarChart, CheckSquare, GitCompare, Eye
 } from 'lucide-react';
 import { CopyButton, VideoResultView, CarouselResultView, OptimizacionResultView } from '../components/guiones/GuionResultViews';
 import GuionesHistoryView from '../components/guiones/GuionesHistoryView';
