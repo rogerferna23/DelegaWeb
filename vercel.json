@@ -1,6 +1,5 @@
 {
   "outputDirectory": "dist",
-  "cleanUrls": true,
   "trailingSlash": false,
   "headers": [
     {
@@ -42,7 +41,7 @@
   ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/((?!assets/|robots\\.txt|sitemap\\.xml|favicon\\.ico|vite\\.svg).*)",
       "destination": "/index.html"
     }
   ]
