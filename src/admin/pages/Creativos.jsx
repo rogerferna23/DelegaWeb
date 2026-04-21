@@ -3,6 +3,7 @@ import {
   Palette, Zap, Plus, ArrowRight, Flame,
 } from 'lucide-react';
 import { DEMO_ACTIVITY } from '../data/modelsData';
+import { useUrlParam } from '../../hooks/useUrlParam';
 
 // Sub-components
 import GenerarTab from '../components/creatives/GenerarTab';
@@ -20,7 +21,10 @@ const TABS = [
 ];
 
 export default function Creativos() {
-  const [activeTab, setActiveTab] = useState('generar');
+  // El tab queda persistido en ?tab=... para que sobreviva a refresh y
+  // a navegaciones entre secciones del admin (antes volvía siempre a
+  // 'generar' aunque viniera de 'biblioteca').
+  const [activeTab, setActiveTab] = useUrlParam('tab', 'generar');
   const [showModelSelector, setShowModelSelector] = useState(false);
   const [selectedModel, setSelectedModel] = useState(null);
 

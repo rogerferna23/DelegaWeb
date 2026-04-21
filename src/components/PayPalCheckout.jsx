@@ -88,21 +88,27 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
   const combinedServiceNames = cartItems.map(item => item.name).join(', ');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="checkout-modal-title"
+    >
       <div className="relative w-full max-w-md bg-[#0d0d0f] border border-white/10 rounded-2xl shadow-2xl overflow-visible">
 
         {/* Close */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-gray-400 hover:text-white transition-all"
+          aria-label="Cerrar checkout"
         >
-          <X className="w-4 h-4" />
+          <X className="w-4 h-4" aria-hidden="true" />
         </button>
 
         {/* Header */}
         <div className="px-6 pt-6 pb-4 border-b border-white/5">
           <p className="text-[10px] text-primary font-semibold tracking-widest uppercase mb-1">Checkout seguro</p>
-          <h2 className="text-base font-bold text-white">Tu Carrito ({cartItems.length} {cartItems.length === 1 ? 'ítem' : 'ítems'})</h2>
+          <h2 id="checkout-modal-title" className="text-base font-bold text-white">Tu Carrito ({cartItems.length} {cartItems.length === 1 ? 'ítem' : 'ítems'})</h2>
           <p className="text-gray-500 text-xs mt-1 leading-snug truncate" title={combinedServiceNames}>
             {combinedServiceNames}
           </p>

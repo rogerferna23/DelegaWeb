@@ -4,9 +4,11 @@ import {
   ChevronLeft, Wand2, Loader2, Info, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { useToast } from '../../../contexts/ToastContext';
 import VideoProcessing from './VideoProcessing';
 
 export default function GenerarVideoModal({ onBack, initialPrompt = '' }) {
+  const toast = useToast();
   const [prompt, setPrompt] = useState(initialPrompt);
   const [duration, setDuration] = useState('15');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -34,7 +36,7 @@ export default function GenerarVideoModal({ onBack, initialPrompt = '' }) {
       setTaskInfo(data.video);
     } catch (err) {
       console.error('Error generating video:', err);
-      alert('Error: ' + err.message);
+      toast.error('Error al generar el video: ' + err.message);
     } finally {
       setIsGenerating(false);
     }

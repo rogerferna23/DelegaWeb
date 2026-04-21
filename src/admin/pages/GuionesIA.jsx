@@ -13,9 +13,12 @@ import GuionesHistoryView from '../components/guiones/GuionesHistoryView';
 import { buildGuionPrompt } from '../components/guiones/GuionPromptBuilder';
 import { generarGuionDocx } from '../utils/generarGuionDocx';
 import { useJob } from '../../contexts/BackgroundJobsContext';
+import { useUrlParam } from '../../hooks/useUrlParam';
 
 export default function GuionesIA() {
-  const [activeTab, setActiveTab] = useState('generar'); // 'generar' | 'historial'
+  // Persistimos el tab activo en ?tab=... para que F5 o compartir link
+  // preserve la vista (generar vs historial).
+  const [activeTab, setActiveTab] = useUrlParam('tab', 'generar'); // 'generar' | 'historial'
   const [generarType, setGenerarType] = useState('carrusel'); // 'video_publicidad', 'video_contenido', 'carrusel', 'optimizar'
   const [estructura, setEstructura] = useState(null);
   const [tono, setTono] = useState('profesional');

@@ -78,8 +78,10 @@ export function usePostulantes() {
       }
       return { success: true };
     } catch (error) {
+      // El alert() nativo se movió al componente vía toast global
+      // (ver ToastContext). El hook devuelve { success, error } para
+      // que el caller decida cómo mostrar el fallo.
       console.error('Error in updatePostulanteStatus:', error);
-      alert('Error al actualizar estado: ' + (error.message || 'Error desconocido'));
       return { success: false, error };
     }
   };

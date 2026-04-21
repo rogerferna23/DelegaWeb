@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Shield, LogIn, LogOut, UserPlus, UserMinus, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { useUrlParam } from '../../hooks/useUrlParam';
 
 const ACTION_CONFIG = {
   login_success:      { label: 'Inicio de sesión',     icon: LogIn,      color: 'text-green-400  bg-green-500/10  border-green-500/20' },
@@ -27,7 +28,10 @@ function timeAgo(dateStr) {
 export default function AuditLog() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  // Persistimos el filtro en ?accion=... para que F5/volver preserve
+  // la vista ("ver sólo logins fallidos" no debería resetearse al
+  // navegar al dashboard y volver).
+  const [filter, setFilter] = useUrlParam('accion', 'all');
 
   useEffect(() => {
     supabase

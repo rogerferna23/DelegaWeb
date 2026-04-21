@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fondo completo para que el sistema operativo recorte a cualquier forma.
+       El "safe zone" para maskable icons es el 80% central; dejamos el logo
+       dentro de ese 80% para que nunca se corte. -->
+  <rect width="512" height="512" fill="#0a0a0a"/>
+  <circle cx="256" cy="256" r="128" fill="#f97316"/>
+  <text x="256" y="300" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="160" font-weight="900" fill="#ffffff">D</text>
+</svg>

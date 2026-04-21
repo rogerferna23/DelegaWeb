@@ -125,10 +125,12 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const initSession = async () => {
       try {
-        // Safety timeout for initial session retrieval (8 seconds max)
+        // Safety timeout para la obtención inicial de sesión. Antes eran 8s;
+        // en redes lentas el usuario podía ver un flash de login aunque tuviera
+        // sesión válida. Subido a 15s para ser más tolerante sin bloquear UX.
         const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('INIT_TIMEOUT')), 8000)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('INIT_TIMEOUT')), 15000)
         );
 
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
@@ -142,13 +144,14 @@ export function AuthProvider({ children }) {
 
     initSession();
 
-    // Secondary safety: Ensure loading is ALWAYS false after 10s regardless of anything else
+    // Secondary safety: Ensure loading is ALWAYS false after 18s regardless of anything else.
+    // Debe ser mayor que el timeout de getSession (15s) + margen.
     const hardTimeout = setTimeout(() => {
       setLoading(prev => {
         if (prev) console.warn("AuthContext: Forzando fin de carga por hard-timeout.");
         return false;
       });
-    }, 10000);
+    }, 18000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
@@ -376,7 +379,21 @@ export function AuthProvider({ children }) {
 
   // --- Flujo de aprobación ---
 
-  const requestAdminAction = async ({ action, targetEmail, targetName, targetRole, targetPassword }) => {
+  const requestAdminAction = async ({
+    action,
+    targetEmail,
+    targetName,
+    targetRole,
+    targetPassword,
+    amount,
+    requestDate,
+    metadata,
+  }) => {
+    // Nota: antes los gastos guardaban el monto en `target_email` y la
+    // fecha en `target_role`. Ahora tenemos columnas propias (amount /
+    // request_date / metadata). Dejamos que los callers nuevos pasen
+    // los campos con nombre claro; si algún caller viejo aún pasa
+    // targetEmail/targetRole los seguimos aceptando.
     const { error } = await supabase.from('admin_requests').insert({
       requested_by: currentUser.id,
       action,
@@ -384,6 +401,9 @@ export function AuthProvider({ children }) {
       target_name: targetName || '',
       target_role: targetRole || '',
       target_password: targetPassword || '',
+      amount: amount ?? null,
+      request_date: requestDate || null,
+      metadata: metadata || {},
     });
     if (error) return { success: false, error: error.message };
     await logAction(currentUser, 'request_submitted', `Solicitud: ${action}`);
@@ -408,11 +428,18 @@ export function AuthProvider({ children }) {
         const target = users.find(u => u.email === req.target_email);
         if (target) await removeAdmin(target.id);
       } else if (req.action === 'add_expense') {
-        // Write gasto to Supabase
+        // Preferimos los campos nuevos (amount / request_date). Si la
+        // solicitud es anterior a la migración, caemos al hack viejo
+        // (monto en target_email, fecha en target_role) para no romper
+        // aprobaciones en vuelo.
+        const resolvedAmount =
+          req.amount != null ? Number(req.amount) : parseFloat(req.target_email) || 0;
+        const resolvedDate = req.request_date || req.target_role;
+
         const { error: gastoError } = await supabase.from('gastos').insert({
           description: req.target_name,
-          amount: parseFloat(req.target_email) || 0,
-          date: req.target_role,
+          amount: resolvedAmount,
+          date: resolvedDate,
         });
         if (gastoError) return { success: false, error: gastoError.message };
       }
