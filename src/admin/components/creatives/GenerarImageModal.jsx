@@ -5,8 +5,10 @@ import {
   CheckCircle2, AlertCircle, RefreshCw, ChevronLeft
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
+import { useToast } from '../../../contexts/ToastContext';
 
 export default function GenerarImageModal({ onBack, initialPrompt = '' }) {
+  const toast = useToast();
   const [prompt, setPrompt] = useState(initialPrompt);
   const [dimensions, setDimensions] = useState('1024x1024');
   const [quality, setQuality] = useState('hd');
@@ -40,7 +42,7 @@ export default function GenerarImageModal({ onBack, initialPrompt = '' }) {
       setResult(data.image);
     } catch (err) {
       console.error('Error generating image:', err);
-      alert('Error al generar la imagen: ' + err.message);
+      toast.error('Error al generar la imagen: ' + err.message);
     } finally {
       setIsGenerating(false);
     }
@@ -191,7 +193,7 @@ export default function GenerarImageModal({ onBack, initialPrompt = '' }) {
             {result ? (
               <div className="flex-1 flex flex-col p-2 space-y-4">
                 <div className="flex-1 rounded-2xl overflow-hidden bg-background relative group">
-                  <img src={result.url} alt="IA Result" className="w-full h-full object-contain" />
+                  <img src={result.url} alt="IA Result" loading="lazy" className="w-full h-full object-contain" />
                   <div className="absolute top-4 right-4 flex gap-2">
                     <a 
                       href={result.url} 

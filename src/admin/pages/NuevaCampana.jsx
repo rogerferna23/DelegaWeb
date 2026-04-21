@@ -15,6 +15,7 @@ import { getCsrfToken } from '../../utils/csrf';
 import { sanitize } from '../../utils/sanitize';
 import { buildCampaignPrompt } from '../components/campaigns/CampaignPromptBuilder';
 import { useJob } from '../../contexts/BackgroundJobsContext';
+import { useToast } from '../../contexts/ToastContext';
 
 // Clave de borrador en localStorage. La versionamos por si el shape
 // del formulario cambia a futuro y necesitamos invalidar drafts viejos.
@@ -71,6 +72,7 @@ const isMeaningfulDraft = (data) => {
 
 export default function NuevaCampana() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [step, setStep] = useState(1);
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -264,7 +266,7 @@ export default function NuevaCampana() {
       return true;
     } catch (err) {
       console.error('Error guardando perfil:', err);
-      alert(`Error: ${err.message || 'No se pudo guardar el perfil del negocio'}`);
+      toast.error(`Error: ${err.message || 'No se pudo guardar el perfil del negocio'}`);
       return false;
     } finally {
       setIsSavingProfile(false);
@@ -367,7 +369,7 @@ export default function NuevaCampana() {
     } catch (err) {
       console.error('Error generando guía:', err);
       // El error ya quedó almacenado en el job — lo mostramos al usuario.
-      alert(`Error al generar la guía: ${err.message || 'Error de conexión'}`);
+      toast.error(`Error al generar la guía: ${err.message || 'Error de conexión'}`);
     }
   };
 
@@ -405,7 +407,7 @@ export default function NuevaCampana() {
       navigate('/admin/campanas');
     } catch (err) {
       console.error('Fallo en guardado seguro:', err);
-      alert(`Error de Seguridad: ${err.message}`);
+      toast.error(`Error de Seguridad: ${err.message}`);
     }
   };
 

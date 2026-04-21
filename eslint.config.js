@@ -24,6 +24,11 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Evita que vuelvan a colarse console.log/debug/info de depuración
+      // en producción. Se permite warn/error porque son útiles para
+      // soporte y son capturados por herramientas tipo Sentry.
+      // Para debug local usar src/utils/logger.js (se silencia en prod).
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
 ])

@@ -106,12 +106,17 @@ export default function AdminLayout() {
       <SecurityBanner />
       {/* ── Inactivity Warning Modal ── */}
       {showWarning && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="inactivity-warning-title"
+        >
           <div className="bg-cardbg border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl text-center">
             <div className="w-12 h-12 rounded-full bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mx-auto mb-4">
-              <Clock className="w-6 h-6 text-orange-400" />
+              <Clock className="w-6 h-6 text-orange-400" aria-hidden="true" />
             </div>
-            <h3 className="text-base font-bold text-white mb-1">¿Sigues ahí?</h3>
+            <h3 id="inactivity-warning-title" className="text-base font-bold text-white mb-1">¿Sigues ahí?</h3>
             <p className="text-gray-400 text-xs mb-4">
               Tu sesión cerrará en{' '}
               <span className="font-mono text-orange-400 font-bold text-sm">{mins > 0 ? `${mins}:${secs}` : countdown}</span>
@@ -270,11 +275,19 @@ export default function AdminLayout() {
                     {/* Pending requests */}
                     {pendingRequests.length > 0 ? (
                       pendingRequests.map(req => {
+                        // Preferir las columnas nuevas (amount, metadata)
+                        // con fallback al hack viejo (target_email/target_role)
+                        // para solicitudes creadas antes de la migración 20260420.
+                        const expenseAmount = req.amount != null
+                          ? Number(req.amount).toLocaleString()
+                          : req.target_email;
+                        const exportMode  = req.metadata?.export_mode  ?? req.target_name;
+                        const exportMonth = req.metadata?.export_month ?? req.target_email;
                         const ACTION_MAP = {
                           create_admin:    { label: 'Agregar admin',     Icon: UserPlus,       color: 'bg-blue-500/10 text-blue-400',    detail: req.target_email },
                           delete_admin:    { label: 'Eliminar admin',    Icon: UserMinus,      color: 'bg-orange-500/10 text-orange-400', detail: req.target_email },
-                          add_expense:     { label: 'Nuevo gasto',       Icon: Receipt,        color: 'bg-red-500/10 text-red-400',       detail: `${req.target_name} · $${req.target_email}` },
-                          download_report: { label: 'Descarga de reporte', Icon: FileSpreadsheet, color: 'bg-green-500/10 text-green-400',  detail: `Excel ${req.target_name === 'year' ? 'año completo' : req.target_email}` },
+                          add_expense:     { label: 'Nuevo gasto',       Icon: Receipt,        color: 'bg-red-500/10 text-red-400',       detail: `${req.target_name} · $${expenseAmount}` },
+                          download_report: { label: 'Descarga de reporte', Icon: FileSpreadsheet, color: 'bg-green-500/10 text-green-400',  detail: `Excel ${exportMode === 'year' ? 'año completo' : exportMonth}` },
                         };
                         const cfg = ACTION_MAP[req.action] || { label: req.action, Icon: FileText, color: 'bg-white/5 text-gray-400', detail: req.target_email };
                         const { label, Icon, color, detail } = cfg;

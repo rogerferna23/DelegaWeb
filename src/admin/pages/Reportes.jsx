@@ -12,6 +12,7 @@ import { useAdminVendors, useAdminGastos, useAdminVentas } from '../AdminDataCon
 import { SERVICES_CATALOG } from '../../constants/services';
 import { exportToExcel } from '../../utils/exportExcel';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { sanitizeText } from '../../lib/sanitize';
 import { validate, gastoSchema, ventaSchema } from '../../schemas/forms.schema';
 
@@ -67,7 +68,7 @@ export default function Reportes() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(null);
-  const [requestToast, setRequestToast] = useState(null);
+  const toast = useToast();
 
   // Ventas form state
   const EMPTY_VENTA_FORM = {
@@ -101,9 +102,11 @@ export default function Reportes() {
     WEB_SERVICES_LIST.some(webSvc => sel.name === webSvc || sel.name.includes('Web con panel'))
   );
 
+  // Adaptador hacia el toast global para mantener las llamadas existentes
+  // (showRequestToast(msg, 'success'|'error'|...)).
   const showRequestToast = (msg, type = 'success') => {
-    setRequestToast({ msg, type });
-    setTimeout(() => setRequestToast(null), 3500);
+    const fn = toast[type] || toast.info;
+    fn(msg);
   };
 
   // Current month key
@@ -203,13 +206,16 @@ export default function Reportes() {
       setOpenMonths(prev => new Set([...prev, getMonthKey(data.date)]));
       setForm(EMPTY_FORM);
     } else {
-      // Regular admin: submit request for approval
+      // Regular admin: submit request for approval.
+      // Usamos los campos con nombre claro (amount / requestDate) en
+      // lugar del hack anterior que metía el monto en targetEmail y la
+      // fecha en targetRole. La columna nueva se añade en la migración
+      // 20260420_admin_requests_proper_columns.sql.
       const result = await requestAdminAction({
         action: 'add_expense',
         targetName: form.description,
-        targetEmail: String(form.amount),
-        targetRole: form.date,
-        targetPassword: '',
+        amount: Number(form.amount),
+        requestDate: form.date,
       });
       if (result.success) {
         setForm(EMPTY_FORM);
@@ -225,13 +231,12 @@ export default function Reportes() {
       exportToExcel({ mode: exportMode, selectedMonth: exportMonth, gastosList: gastos, totalsByMonth, ingresosPerMonth, vendors, products: PRODUCTS });
       setShowExportModal(false);
     } else {
-      // Regular admin: request approval
+      // Regular admin: request approval. Los parámetros específicos de
+      // exportación viajan en `metadata` en vez de reutilizar campos
+      // pensados para otra cosa.
       const result = await requestAdminAction({
         action: 'download_report',
-        targetName: exportMode,
-        targetEmail: exportMonth,
-        targetRole: '',
-        targetPassword: '',
+        metadata: { export_mode: exportMode, export_month: exportMonth },
       });
       setShowExportModal(false);
       if (result.success) {
@@ -247,28 +252,34 @@ export default function Reportes() {
 
   return (
     <div className="relative">
-      {/* Request toast */}
-      {requestToast && (
-        <div className="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-xl text-xs font-medium shadow-lg border bg-green-500/10 border-green-500/20 text-green-400">
-          {requestToast.msg}
-        </div>
-      )}
+      {/* Los toasts ahora se renderizan desde ToastProvider (main.jsx). */}
 
       {/* Export Modal */}
       {showExportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="export-modal-title"
+        >
           <div className="bg-cardbg border border-white/10 rounded-xl p-6 w-full max-w-sm shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <FileSpreadsheet className="w-4 h-4 text-green-400" />
+                  <FileSpreadsheet className="w-4 h-4 text-green-400" aria-hidden="true" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-white">Exportar a Excel</h2>
+                  <h2 id="export-modal-title" className="text-sm font-semibold text-white">Exportar a Excel</h2>
                   <p className="text-[10px] text-gray-500">4 hojas de datos</p>
                 </div>
               </div>
-              <button onClick={() => setShowExportModal(false)} className="text-gray-500 hover:text-white transition-colors">✕</button>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-gray-500 hover:text-white transition-colors"
+                aria-label="Cerrar"
+              >
+                <span aria-hidden="true">✕</span>
+              </button>
             </div>
             <div className="bg-background border border-white/5 rounded-lg p-3 mb-4 space-y-1.5">
               <p className="text-[10px] text-gray-500 mb-2 font-medium uppercase tracking-wide">Hojas incluidas</p>
@@ -411,46 +422,55 @@ export default function Reportes() {
           </div>
 
           {/* Always-visible add form */}
-          <form onSubmit={handleAddGasto} className="mt-3.5">
+          <form onSubmit={handleAddGasto} className="mt-3.5" aria-label="Registrar nuevo gasto" aria-describedby={formError ? 'gasto-form-error' : undefined}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="text-[10px] font-medium text-gray-400 mb-1 block">Descripción *</label>
+                <label htmlFor="gasto-description" className="text-[10px] font-medium text-gray-400 mb-1 block">Descripción *</label>
                 <input
+                  id="gasto-description"
                   type="text" value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   placeholder="Ej: Hosting, Publicidad, Nómina..."
+                  aria-invalid={!!formError}
+                  aria-required="true"
                   className="w-full bg-background border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/40 transition-all"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-gray-400 mb-1 block">Importe ($) *</label>
+                <label htmlFor="gasto-amount" className="text-[10px] font-medium text-gray-400 mb-1 block">Importe ($) *</label>
                 <input
+                  id="gasto-amount"
                   type="number" min="0" step="0.01" value={form.amount}
                   onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
                   placeholder="0.00"
+                  aria-invalid={!!formError}
+                  aria-required="true"
                   className="w-full bg-background border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-primary/40 transition-all"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-medium text-gray-400 mb-1 block">Fecha de pago *</label>
+                <label htmlFor="gasto-date" className="text-[10px] font-medium text-gray-400 mb-1 block">Fecha de pago *</label>
                 <div className="flex gap-2">
                   <input
+                    id="gasto-date"
                     type="date" value={form.date}
                     onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                    aria-invalid={!!formError}
+                    aria-required="true"
                     className="flex-1 bg-background border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/40 transition-all [color-scheme:dark]"
                   />
                   <button type="submit"
                     className="flex items-center gap-1 bg-primary hover:bg-primaryhover text-white font-semibold px-3 py-2 rounded-lg text-xs transition-all whitespace-nowrap">
                     {isSuperAdmin
-                      ? <><Plus className="w-3.5 h-3.5" /> Agregar</>
-                      : <><Send className="w-3.5 h-3.5" /> Solicitar</>}
+                      ? <><Plus className="w-3.5 h-3.5" aria-hidden="true" /> Agregar</>
+                      : <><Send className="w-3.5 h-3.5" aria-hidden="true" /> Solicitar</>}
                   </button>
                 </div>
               </div>
             </div>
             {formError && (
-              <div className="flex items-center gap-1.5 text-red-400 text-[10px] bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2 mt-2">
-                <AlertCircle className="w-3.5 h-3.5" /> {formError}
+              <div id="gasto-form-error" role="alert" className="flex items-center gap-1.5 text-red-400 text-[10px] bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2 mt-2">
+                <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" /> {formError}
               </div>
             )}
           </form>

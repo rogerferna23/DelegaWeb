@@ -1,11 +1,12 @@
 import React from 'react';
 import { usePostulantes } from '../../hooks/usePostulantes';
-import { 
-  UserPlus, 
-  Mail, 
-  MessageSquare, 
-  Trash2, 
-  Globe, 
+import { useToast } from '../../contexts/ToastContext';
+import {
+  UserPlus,
+  Mail,
+  MessageSquare,
+  Trash2,
+  Globe,
   Calendar,
   CheckCircle2,
   Clock,
@@ -16,6 +17,7 @@ import {
 
 export default function Postulantes() {
   const { postulantes, loading, removePostulante, updatePostulanteStatus } = usePostulantes();
+  const toast = useToast();
 
   const fmtDate = (d) => {
     if (!d) return '—';
@@ -39,9 +41,11 @@ export default function Postulantes() {
     
     // El borrado es directo para evitar bloqueos del navegador con popups nativos
     const { success, error } = await removePostulante(id);
-    
+
     if (!success) {
-      alert('Error al eliminar: ' + (error?.message || 'Error de permisos'));
+      toast.error('Error al eliminar: ' + (error?.message || 'Error de permisos'));
+    } else {
+      toast.success('Postulante eliminado');
     }
   };
 

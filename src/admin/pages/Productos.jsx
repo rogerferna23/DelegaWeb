@@ -2,10 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { Package, Search, Calendar, ShoppingCart, Wrench, Megaphone, Users, Rocket, DollarSign } from 'lucide-react';
 import { useAdminVentas } from '../AdminDataContext';
 import { SERVICES_CATALOG } from '../../constants/services';
+import { useUrlParam } from '../../hooks/useUrlParam';
 
 export default function Productos() {
   const { ventas } = useAdminVentas();
-  const [search, setSearch] = useState('');
+  // `?q=...` para que el término buscado sobreviva F5 y se pueda
+  // compartir un link a un resultado filtrado concreto.
+  const [search, setSearch] = useUrlParam('q', '');
 
   // Default date range: start of current month to today
   const [dateFrom, setDateFrom] = useState(() => {
