@@ -1,17 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { sendSaleNotification } from '../services/emailService';
 
-// Tamaño de lote para cargar ventas sin bloquear el navegador.
-// La UI va mostrando datos conforme llegan; útil cuando hay muchos registros.
-const PAGE_SIZE = 500;
+// Ventana de tiempo por defecto: últimos 13 meses.
+// Cubre el año completo + el mes anterior para que los filtros
+// "mes anterior" de Reportes y Productos nunca queden vacíos.
+function defaultDateFrom() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 13);
+  d.setDate(1);
+  return d.toISOString().split('T')[0];
+}
 
-export function useVentas() {
+const PAGE_SIZE = 200;
+
+export function useVentas({ dateFrom } = {}) {
   const [ventas, setVentas] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Helper function to map from Supabase snake_case to UI camelCase expected structure
-  const mapSupabaseToVenta = (row) => ({
+  const from = dateFrom || defaultDateFrom();
+  // dateTo no se aplica en la query — solo acortamos el inicio para no
+  // traer toda la historia. El extremo superior lo filtra la UI.
+
+  const mapSupabaseToVenta = useCallback((row) => ({
     id: row.id,
     servicio: row.servicio || 'Desconocido',
     clienteNombre: row.cliente_nombre || 'Cliente Web',
@@ -19,53 +30,58 @@ export function useVentas() {
     importe: row.importe || 0,
     moneda: row.moneda || 'USD',
     prioridad: row.prioridad || false,
-    fecha: row.fecha || (row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]),
+    fecha: row.fecha || (row.created_at
+      ? new Date(row.created_at).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]),
     origen: row.origen || 'web',
     estado: row.estado || 'pendiente',
-    paypal_order_id: row.paypal_order_id
-  });
+    paypal_order_id: row.paypal_order_id,
+  }), []);
 
   useEffect(() => {
     let cancelled = false;
 
-    // Carga progresiva por lotes. En vez de traer miles de filas en una sola
-    // query, traemos PAGE_SIZE a la vez y vamos concatenando. Así la UI
-    // muestra las primeras ventas casi al instante.
-    const fetchVentasPaginated = async () => {
+    const fetchVentas = async () => {
       setLoading(true);
-      let from = 0;
+      let offset = 0;
+      const accumulated = [];
 
       while (!cancelled) {
         const { data, error } = await supabase
           .from('ventas')
           .select('*')
+          .gte('created_at', from)      // filtro server-side — created_at siempre está presente
           .order('created_at', { ascending: false })
-          .range(from, from + PAGE_SIZE - 1);
+          .range(offset, offset + PAGE_SIZE - 1);
 
         if (error || !data) break;
 
-        const mapped = data.map(mapSupabaseToVenta);
-        setVentas(prev => (from === 0 ? mapped : [...prev, ...mapped]));
+        accumulated.push(...data.map(mapSupabaseToVenta));
+        setVentas([...accumulated]);    // actualización progresiva
 
         if (data.length < PAGE_SIZE) break;
-        from += PAGE_SIZE;
+        offset += PAGE_SIZE;
       }
 
       if (!cancelled) setLoading(false);
     };
 
-    fetchVentasPaginated();
+    fetchVentas();
 
-    // Realtime: insert/update/delete se aplican al array en memoria.
+    // Realtime: insert/update/delete dentro de la ventana cargada.
     const subscription = supabase
       .channel('ventas_channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ventas' }, (payload) => {
         if (payload.eventType === 'INSERT') {
-          setVentas(prev => [mapSupabaseToVenta(payload.new), ...prev]);
+          const v = mapSupabaseToVenta(payload.new);
+          const insertedAt = payload.new.created_at?.split('T')[0] || '';
+          if (insertedAt >= from) setVentas(prev => [v, ...prev]);
         } else if (payload.eventType === 'DELETE') {
           setVentas(prev => prev.filter(v => v.id !== payload.old.id));
         } else if (payload.eventType === 'UPDATE') {
-          setVentas(prev => prev.map(v => v.id === payload.new.id ? mapSupabaseToVenta(payload.new) : v));
+          setVentas(prev => prev.map(v =>
+            v.id === payload.new.id ? mapSupabaseToVenta(payload.new) : v
+          ));
         }
       })
       .subscribe();
@@ -74,13 +90,12 @@ export function useVentas() {
       cancelled = true;
       supabase.removeChannel(subscription);
     };
-  }, []);
+  }, [from, mapSupabaseToVenta]);
 
   const addVenta = async (entry) => {
-    // This is called from the Admin Panel (Manual sales)
-    // Create a timestamp from the manual date: 'YYYY-MM-DD' -> 'YYYY-MM-DDT12:00:00.000Z'
-    // We add 12:00:00 to avoid UTC timezone offset putting it on the previous day
-    const fechaTimestamp = entry.fecha ? new Date(`${entry.fecha}T12:00:00Z`).toISOString() : undefined;
+    const fechaTimestamp = entry.fecha
+      ? new Date(`${entry.fecha}T12:00:00Z`).toISOString()
+      : undefined;
 
     const { error } = await supabase.from('ventas').insert({
       servicio: entry.servicio,
@@ -91,34 +106,26 @@ export function useVentas() {
       prioridad: entry.prioridad || false,
       origen: 'manual',
       estado: 'pendiente',
-      ...(fechaTimestamp ? { created_at: fechaTimestamp } : {})
+      ...(fechaTimestamp ? { created_at: fechaTimestamp } : {}),
     }).select().single();
 
-    // We don't manually setVentas because the realtime subscription will catch the INSERT and add it.
     if (error) {
       console.error('Error adding venta:', error);
       return { success: false, error };
     }
 
-    // Trigger email notification for manual sale
     sendSaleNotification(entry, 'manual');
-
     return { success: true };
   };
 
   const removeVenta = async (id) => {
-    // Delete from Supabase
     await supabase.from('ventas').delete().eq('id', id);
-    // Realtime subscription will handle removing from UI
   };
 
   const approveVenta = async (id) => {
-    // Update in Supabase
     await supabase.from('ventas').update({ estado: 'pagado' }).eq('id', id);
-    // Realtime subscription will handle the state update in the UI
   };
 
-  // Only sum 'pagado' sales for the total
   const totalVentas = ventas
     .filter(v => v.estado === 'pagado')
     .reduce((sum, v) => sum + (v.importe || 0), 0);

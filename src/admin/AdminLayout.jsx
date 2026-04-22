@@ -11,6 +11,7 @@ import {
 
 import SecurityBanner from './components/SecurityBanner';
 import BackgroundJobsIndicator from './components/BackgroundJobsIndicator';
+import TimeAgo from './components/TimeAgo';
 
 const navItems = [
   { label: 'Dashboard',     icon: LayoutDashboard, path: '/admin' },
@@ -34,13 +35,6 @@ export default function AdminLayout() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [processing, setProcessing] = useState(null);
   const notifRef = useRef(null);
-  const [now, setNow] = useState(() => Date.now());
-
-  // Update clock every minute for pure timeAgo and live updates
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(timer);
-  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -75,18 +69,6 @@ export default function AdminLayout() {
 
   const pendingCount = pendingRequests?.length || 0;
   const resolvedRequests = (allRequests || []).filter(r => r.status !== 'pending').slice(0, 5);
-
-  function timeAgo(dateStr) {
-    const timestamp = new Date(dateStr).getTime();
-    const diff = now - timestamp;
-    const m = Math.floor(diff / 60000);
-    const h = Math.floor(diff / 3600000);
-    const d = Math.floor(diff / 86400000);
-    if (m < 1) return 'ahora';
-    if (m < 60) return `hace ${m}m`;
-    if (h < 24) return `hace ${h}h`;
-    return `hace ${d}d`;
-  }
 
   const allNavItems = [
     ...navItems,
@@ -300,7 +282,7 @@ export default function AdminLayout() {
                               <div className="flex-1 min-w-0">
                                 <p className="text-[11px] font-medium text-white">{label}</p>
                                 <p className="text-[10px] text-gray-500 truncate">{detail}</p>
-                                <p className="text-[9px] text-gray-600">{timeAgo(req.created_at)}</p>
+                                <TimeAgo dateStr={req.created_at} className="text-[9px] text-gray-600" />
                                 <div className="flex gap-1.5 mt-1.5">
                                   <button
                                     onClick={() => handleReviewInline(req.id, true)}
@@ -345,7 +327,7 @@ export default function AdminLayout() {
                             <div className="flex-1 min-w-0">
                               <p className="text-[10px] text-gray-400 truncate">{req.target_email}</p>
                               <p className="text-[9px] text-gray-600">
-                                {req.status === 'approved' ? '✅ Aprobada' : '❌ Rechazada'} · {timeAgo(req.created_at)}
+                                {req.status === 'approved' ? '✅ Aprobada' : '❌ Rechazada'} · <TimeAgo dateStr={req.created_at} />
                               </p>
                             </div>
                           </div>
