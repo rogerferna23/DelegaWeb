@@ -22,7 +22,7 @@ async function encrypt(text: string, keyStr: string) {
 async function decrypt(cipherJson: string, keyStr: string) {
   const { iv, data } = JSON.parse(atob(cipherJson));
   const key = await getCryptoKey(keyStr);
-  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(iv) }, key, new TextEncoder().encode(data));
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(iv) }, key, new Uint8Array(data));
   return new TextDecoder().decode(decrypted);
 }
 
