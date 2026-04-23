@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    /* Lenguaje y módulos */
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    /* JSX */
+    "jsx": "react-jsx",
+
+    /* Interop con JS existente — permite migración gradual */
+    "allowJs": true,
+    "checkJs": false,
+
+    /* Strictness */
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+
+    /* Imports */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "ignoreDeprecations": "6.0",
+
+    /* Output — Vite compila, TypeScript solo verifica */
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    /* Paths */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*", "vite.config.ts"],
+  "exclude": ["node_modules", "dist", "Sofia-IA", "scripts", "tmp"]
+}
