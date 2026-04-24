@@ -34,22 +34,15 @@ async function validateCsrf(req: Request, userId: string): Promise<boolean> {
 
   const { data } = await supabaseService
     .from("csrf_tokens")
-    .select("id")
+    .update({ used: true })
     .eq("user_id", userId)
     .eq("token", token)
     .eq("used", false)
     .gt("expires_at", new Date().toISOString())
+    .select("id")
     .single();
 
-  if (!data) return false;
-
-  // Marcar como usado (single-use)
-  await supabaseService
-    .from("csrf_tokens")
-    .update({ used: true })
-    .eq("id", data.id);
-
-  return true;
+  return !!data;
 }
 
 serve(async (req) => {

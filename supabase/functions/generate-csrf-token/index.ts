@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const allowedOrigins = ["https://delegaweb.com", "http://localhost:5173", "http://localhost:5174"];
+const extraOrigins = Deno.env.get("ALLOWED_DEV_ORIGINS")?.split(",").map((o: string) => o.trim()) ?? [];
+const allowedOrigins = ["https://delegaweb.com", ...extraOrigins];
 
 serve(async (req) => {
   const origin = req.headers.get("origin");
