@@ -116,50 +116,21 @@ function generateTempPassword(): string {
   return Array.from(bytes, b => chars[b % chars.length]).join('');
 }
 
-// ── Cached session ────────────────────────────────────────────────────────────
-
-// Reads the Supabase session from localStorage synchronously so the app never
-// blocks on a network call just to know if the user is logged in.
-function readCachedSession(): { id: string; email?: string } | null {
-  try {
-    const prefix = 'sb-';
-    const suffix = '-auth-token';
-    const key = Object.keys(localStorage).find(
-      k => k.startsWith(prefix) && k.endsWith(suffix)
-    );
-    if (!key) return null;
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const user = parsed?.user ?? parsed?.session?.user;
-    if (!user?.id) return null;
-    // Strict expiry check: reject if missing or expired (with 30s safety margin).
-    // Without this, stale tokens left over from a previous logout would briefly
-    // flash the dashboard before initSession() invalidates them.
-    const exp: number | undefined = parsed?.expires_at ?? parsed?.session?.expires_at;
-    if (!exp || exp * 1000 < Date.now() + 30_000) return null;
-    return { id: user.id, email: user.email };
-  } catch {
-    return null;
-  }
-}
-
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    // Initialize from cache so the app never shows a loading screen when the
-    // user is already logged in. applySession() will overwrite this with the
-    // real profile (name, role) once the network responds.
-    const cached = readCachedSession();
-    if (!cached) return null;
-    return { id: cached.id, email: cached.email, role: 'admin', name: cached.email?.split('@')[0] || '' };
-  });
+  // Never trust the cache as ground truth — start with currentUser=null and
+  // let initSession() decide. Reading the cache and showing the panel before
+  // getSession() confirms causes the "panel → login flash" bug when the
+  // cached token is stale (logout from another tab, expired refresh, etc).
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [pendingRequests, setPendingRequests] = useState<AdminRequest[]>([]);
   const [allRequests, setAllRequests] = useState<AdminRequest[]>([]);
-  // Skip the loading screen when the cache already tells us the user is logged in.
-  const [loading, setLoading] = useState(() => !readCachedSession());
+  // Always start with loading=true so we don't render the dashboard or the
+  // login form until initSession() resolves. This adds a brief loading
+  // screen but eliminates the flash entirely.
+  const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (user: { id: string }): Promise<UserProfile | null> => {
     try {
