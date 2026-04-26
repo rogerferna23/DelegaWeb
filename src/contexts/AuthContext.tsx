@@ -278,17 +278,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
     try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('TIMEOUT_ERROR')), 25000)
-      );
+      const MAX_ATTEMPTS = 3;
+      const ATTEMPT_TIMEOUT_MS = 12000;
 
-      const { data, error } = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
-        timeoutPromise,
-      ]).catch(err => {
-        if (err.message === 'TIMEOUT_ERROR') throw err;
-        throw new Error('NETWORK_ERROR');
-      });
+      const attemptSignIn = (): Promise<Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>> =>
+        Promise.race([
+          supabase.auth.signInWithPassword({ email, password }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('TIMEOUT_ERROR')), ATTEMPT_TIMEOUT_MS)
+          ),
+        ]);
+
+      let lastErr: unknown;
+      let result: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>> | null = null;
+
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          result = await attemptSignIn();
+          break;
+        } catch (err) {
+          lastErr = err;
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg !== 'TIMEOUT_ERROR') throw new Error('NETWORK_ERROR');
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise(r => setTimeout(r, 800 * attempt));
+          }
+        }
+      }
+
+      if (!result) {
+        // All attempts timed out — clear stale Supabase tokens and report
+        try {
+          Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+        } catch { /* ignore */ }
+        console.error('Login: todos los intentos agotados', lastErr);
+        return { success: false, error: 'No se pudo conectar con el servidor. Verifica tu conexión e inténtalo de nuevo.' };
+      }
+
+      const { data, error } = result;
 
       if (error) {
         return { success: false, error: 'Credenciales inválidas.' };
@@ -346,14 +373,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error('Error en login:', msg);
-      if (msg === 'TIMEOUT_ERROR') {
-        try {
-          const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith('sb-'));
-          keysToRemove.forEach(k => localStorage.removeItem(k));
-        } catch { /* ignore localStorage errors */ }
-        return { success: false, error: 'La conexión tardó demasiado (Timeout). Hemos limpiado la caché, intenta nuevamente conectarte a una red estable.' };
-      }
-      return { success: false, error: 'Error de conexión directa con Supabase.' };
+      return { success: false, error: 'Error de conexión. Verifica tu red e inténtalo de nuevo.' };
     }
   };
 
