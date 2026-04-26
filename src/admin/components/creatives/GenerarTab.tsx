@@ -155,13 +155,25 @@ function PresetCard({ preset, onClick }: PresetCardProps) {
       onClick={onClick}
       className="group relative rounded-2xl overflow-hidden bg-cardbg border border-white/5 hover:border-primary/30 transition-all duration-300 text-left"
     >
-      {/* Image Area */}
-      <div className={`relative bg-gradient-to-br ${gradient} ${isSmall ? 'aspect-[4/3]' : 'aspect-[3/4]'}`}>
+      {/* Image Area — gradiente como fallback, foto real encima */}
+      <div className={`relative bg-gradient-to-br ${gradient} ${isSmall ? 'aspect-[4/3]' : 'aspect-[3/4]'} overflow-hidden`}>
+        {preset.previewUrl && (
+          <img
+            src={preset.previewUrl}
+            alt={preset.name}
+            loading="lazy"
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        )}
+        {/* Gradiente oscuro inferior para legibilidad de los badges */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/20 z-[1]" />
+
         {/* Badges */}
         <div className="absolute top-3 left-3 flex gap-1.5 z-10">
           {preset.badge && (
             <span
-              className="px-2 py-0.5 rounded text-[9px] font-bold text-white"
+              className="px-2 py-0.5 rounded text-[9px] font-bold text-white shadow-lg"
               style={{ backgroundColor: preset.badgeColor ?? undefined }}
             >
               {preset.badge}
@@ -169,13 +181,13 @@ function PresetCard({ preset, onClick }: PresetCardProps) {
           )}
         </div>
         <div className="absolute top-3 right-3 z-10">
-          <span className="px-2 py-0.5 rounded text-[9px] font-bold text-white bg-blue-500/80">
+          <span className="px-2 py-0.5 rounded text-[9px] font-bold text-white bg-blue-500/80 shadow-lg">
             {preset.typeBadge}
           </span>
         </div>
 
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all" />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all z-[2]" />
       </div>
 
       {/* Text */}
