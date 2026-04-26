@@ -41,7 +41,10 @@
       "Bash(head -30 src/constants/services.js)",
       "Bash(head -30 src/admin/hooks/useCampaignDraft.tsx src/admin/hooks/useBusinessProfiles.tsx)",
       "Bash(head -30 src/admin/hooks/useCampaignDraft.js src/admin/hooks/useBusinessProfiles.js)",
-      "Bash(find src *)"
+      "Bash(find src *)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
