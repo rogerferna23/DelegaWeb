@@ -13,12 +13,25 @@ const falKey = Deno.env.get("FAL_KEY")!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-serve(async (req: Request) => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+const ALLOWED_ORIGINS = [
+  "https://delegaweb.com",
+  "https://www.delegaweb.com",
+  "https://delega-web.vercel.app",
+  "http://localhost:5173",
+];
+function buildCors(req: Request): HeadersInit {
+  const origin = req.headers.get("origin") ?? "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Vary": "Origin",
   };
+}
+
+serve(async (req: Request) => {
+  const corsHeaders = buildCors(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -61,6 +74,10 @@ serve(async (req: Request) => {
       `https://queue.fal.run/${falModel}/requests/${falRequestId}/status`,
       { headers: { Authorization: `Key ${falKey}` } },
     );
+    if (!statusResp.ok) {
+      const errText = await statusResp.text();
+      throw new Error(`FAL status error (${statusResp.status}): ${errText}`);
+    }
     const statusData = await statusResp.json();
 
     let status = "processing";
@@ -73,6 +90,10 @@ serve(async (req: Request) => {
         `https://queue.fal.run/${falModel}/requests/${falRequestId}`,
         { headers: { Authorization: `Key ${falKey}` } },
       );
+      if (!resultResp.ok) {
+        const errText = await resultResp.text();
+        throw new Error(`FAL result error (${resultResp.status}): ${errText}`);
+      }
       const resultData = await resultResp.json();
       videoUrl = resultData.video?.url ?? resultData.output?.url ?? null;
       status = videoUrl ? "completed" : "failed";

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { logAction } from '../lib/auditLog';
 import { getCsrfToken } from '../utils/csrf';
@@ -211,7 +211,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPendingRequests(rows.filter(r => r.status === 'pending'));
   };
 
+  // Track pending profile-retry timeouts so they get cleared on unmount,
+  // logout, or when a new applySession() supersedes them.
+  const profileRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const applySession = useCallback(async (authUser: { id: string; email?: string }) => {
+    // Cancel any pending retry from a previous applySession
+    if (profileRetryTimeoutRef.current) {
+      clearTimeout(profileRetryTimeoutRef.current);
+      profileRetryTimeoutRef.current = null;
+    }
     try {
       if (!authUser) {
         setCurrentUser(null);
@@ -234,7 +243,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         setCurrentUser(fallbackUser);
 
-        setTimeout(async () => {
+        profileRetryTimeoutRef.current = setTimeout(async () => {
+          profileRetryTimeoutRef.current = null;
           const retry = await fetchProfile(authUser);
           if (retry) {
             setCurrentUser({ ...authUser, role: retry.role, name: retry.name });
@@ -329,6 +339,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
       clearTimeout(hardTimeout);
+      if (profileRetryTimeoutRef.current) {
+        clearTimeout(profileRetryTimeoutRef.current);
+        profileRetryTimeoutRef.current = null;
+      }
     };
   }, [applySession]);
 

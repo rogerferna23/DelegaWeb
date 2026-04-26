@@ -52,7 +52,10 @@ export default function Reportes() {
         const d = new Date(v.fecha);
         const idx = d.getMonth();
         if (!isNaN(idx) && idx >= 0 && idx < 12) {
-          acc[MONTHS[idx]] += parseFloat(String(v.importe) || '0');
+          // Si importe es null/corrupto, parseFloat devuelve NaN — lo descartamos
+          // para no contaminar la suma con NaN propagado en el resto de cálculos.
+          const amount = parseFloat(String(v.importe ?? '0'));
+          if (!isNaN(amount)) acc[MONTHS[idx]] += amount;
         }
       }
     });

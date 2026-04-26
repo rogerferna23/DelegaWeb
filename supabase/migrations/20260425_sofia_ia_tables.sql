@@ -27,13 +27,17 @@ create table if not exists sofia_chat_states (
 -- ── RPC: atomic increment ─────────────────────────────────────────────────────
 
 create or replace function sofia_increment_price_asked(p_chat_id text)
-returns void language plpgsql as $$
+returns integer language plpgsql as $$
+declare
+  v_new_count integer;
 begin
   insert into sofia_chat_states (chat_id, price_asked_count)
     values (p_chat_id, 1)
   on conflict (chat_id) do update
     set price_asked_count = sofia_chat_states.price_asked_count + 1,
-        updated_at        = now();
+        updated_at        = now()
+  returning price_asked_count into v_new_count;
+  return v_new_count;
 end;
 $$;
 

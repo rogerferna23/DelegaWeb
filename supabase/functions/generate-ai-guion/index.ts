@@ -61,6 +61,16 @@ serve(async (req: Request) => {
       .eq('user_id', user.id)
       .maybeSingle();
     
+    // Validamos al menos una clave disponible antes de cualquier fallback —
+    // así devolvemos un 500 claro en vez de fallar más tarde con un error
+    // críptico de "Authorization header missing".
+    if (!ANTHROPIC_KEY && !OPENAI_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Servidor sin configurar: faltan ANTHROPIC_API_KEY y OPENAI_API_KEY" }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
     let modelToUse = userPref?.preferred_claude_model || 'claude-sonnet-4-6';
     let provider = modelToUse.startsWith('gpt-') ? 'openai' : 'anthropic';
 

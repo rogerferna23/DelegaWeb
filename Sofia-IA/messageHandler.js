@@ -130,6 +130,11 @@ async function handleMessage(client, msg) {
 
   } catch (err) {
     console.error(`[Handler] Error processing message from ${contactName}:`, err.message);
+    // Avisar al cliente para que no quede sin respuesta — antes el bot
+    // se quedaba mudo si fallaba la IA o la BD.
+    try {
+      await msg.reply('Disculpa, tuve un problema técnico. ¿Puedes repetirme tu mensaje en un minuto?');
+    } catch { /* el envío también falló — nada más que hacer */ }
   }
 }
 

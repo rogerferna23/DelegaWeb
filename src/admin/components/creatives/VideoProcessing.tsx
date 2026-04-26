@@ -22,10 +22,14 @@ export default function VideoProcessing({ videoId, onBack }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (status !== 'processing') return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+
     const checkStatus = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-
         const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-video-status`, {
           method: 'POST',
           headers: {
@@ -33,32 +37,31 @@ export default function VideoProcessing({ videoId, onBack }: Props) {
             'Authorization': `Bearer ${session?.access_token}`,
           },
           body: JSON.stringify({ videoId }),
+          signal: controller.signal,
         });
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         if (!data.ok) throw new Error(data.error);
+        if (cancelled) return;
 
         setStatus(data.status as VideoStatus);
         setProgress(data.progress);
-
         if (data.status === 'completed' && data.videoUrl) {
           setVideoUrl(data.videoUrl as string);
         } else if (data.status === 'failed') {
           setError('La generación de video falló. Por favor intenta de nuevo.');
         }
       } catch (err) {
+        if ((err as Error).name === 'AbortError' || cancelled) return;
         console.error('Error checking video status:', err);
       }
     };
 
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-
-    if (status === 'processing') {
-      intervalId = setInterval(checkStatus, 10000);
-    }
-
+    const intervalId = setInterval(checkStatus, 10000);
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      cancelled = true;
+      controller.abort();
+      clearInterval(intervalId);
     };
   }, [status, videoId]);
 
