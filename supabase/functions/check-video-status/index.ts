@@ -21,7 +21,45 @@ serve(async (req: Request) => {
   }
 
   try {
+    // Autenticar usuario
+    const authHeader = req.headers.get("Authorization");
+    const token = authHeader?.replace("Bearer ", "");
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: corsHeaders }
+      );
+    }
+
     const { videoId, runwayProjectId } = await req.json();
+
+    if (!videoId || !runwayProjectId) {
+      return new Response(
+        JSON.stringify({ error: "videoId y runwayProjectId son requeridos" }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Verificar que el video pertenece al usuario autenticado
+    const { data: videoRecord, error: videoError } = await supabase
+      .from("generated_videos")
+      .select("id")
+      .eq("id", videoId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (videoError || !videoRecord) {
+      return new Response(
+        JSON.stringify({ error: "Video no encontrado" }),
+        { status: 404, headers: corsHeaders }
+      );
+    }
 
     // Consultar estado en Runway
     const runwayResponse = await fetch(
@@ -43,7 +81,7 @@ serve(async (req: Request) => {
     if (runwayData.status === "SUCCEEDED") {
       status = "completed";
       progress = 100;
-      videoUrl = runwayData.output[0]?.url; 
+      videoUrl = runwayData.output?.[0]?.url ?? null;
     } else if (runwayData.status === "FAILED") {
       status = "failed";
     } else if (runwayData.status === "QUEUED") {
@@ -53,7 +91,7 @@ serve(async (req: Request) => {
     }
 
     // Actualizar en BD
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       status,
       progress_percent: progress,
     };
@@ -66,7 +104,8 @@ serve(async (req: Request) => {
     const { error: updateError } = await supabase
       .from("generated_videos")
       .update(updateData)
-      .eq("id", videoId);
+      .eq("id", videoId)
+      .eq("user_id", user.id);
 
     if (updateError) {
       throw updateError;
