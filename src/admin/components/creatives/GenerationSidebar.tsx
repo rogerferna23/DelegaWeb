@@ -36,6 +36,8 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
   useEffect(() => {
     if (preset) {
       setPrompt((preset as Record<string, unknown>).imageDesc as string || '');
+      setResult(null);
+      setImageLoadError(false);
     }
   }, [preset]);
 
@@ -81,11 +83,19 @@ Reglas:
 - Añade detalles técnicos: iluminación, ángulo de cámara, estilo, calidad ("ultra detailed", "professional studio lighting", "8k", "shallow depth of field" cuando aplique).
 - Máximo 80 palabras.`;
 
-      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-ai-guion`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ systemPrompt, userPrompt: prompt }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30_000);
+      let r: Response;
+      try {
+        r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-ai-guion`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ systemPrompt, userPrompt: prompt }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       const data = await r.json();
       if (!r.ok || !data.result) {
         throw new Error(data.error || 'No se pudo mejorar el prompt');
@@ -343,7 +353,7 @@ Reglas:
           </button>
 
           {result && (
-            <div className="mt-4 p-3 bg-background border border-white/10 rounded-xl">
+            <div className="mt-4">
               {result.kind === 'image' && (
                 <>
                   {imageLoadError ? (
