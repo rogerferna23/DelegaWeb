@@ -26,6 +26,8 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
   const [duration, setDuration] = useState(8);
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [imageLoadError, setImageLoadError] = useState(false);
+  const [isImproving, setIsImproving] = useState(false);
 
   const isVideo = mediaType === 'video' || mediaType === 'img2vid';
   const allModels = isVideo ? VIDEO_MODELS : IMAGE_MODELS;
@@ -60,6 +62,43 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
     return () => clearInterval(intervalId);
   }, [result, toast]);
 
+  const handleImprovePrompt = async () => {
+    if (prompt.trim().length < 5) {
+      toast.error('Escribe al menos una idea breve antes de mejorar el prompt.');
+      return;
+    }
+    try {
+      setIsImproving(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const targetType = isVideo ? 'video' : 'imagen';
+      const systemPrompt = `Eres un experto en prompt engineering para modelos de generación de ${targetType} (FAL.ai, Flux, Imagen, Seedream, Kling, etc.).
+Tu tarea es reescribir el prompt del usuario para que produzca un mejor resultado visual.
+
+Reglas:
+- Devuelve SOLO el prompt mejorado, sin explicaciones, sin comillas, sin viñetas.
+- Mantén el idioma del usuario (español si está en español, inglés si está en inglés).
+- Conserva los elementos clave que el usuario menciona (producto, marca, color, escena).
+- Añade detalles técnicos: iluminación, ángulo de cámara, estilo, calidad ("ultra detailed", "professional studio lighting", "8k", "shallow depth of field" cuando aplique).
+- Máximo 80 palabras.`;
+
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-ai-guion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ systemPrompt, userPrompt: prompt }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.result) {
+        throw new Error(data.error || 'No se pudo mejorar el prompt');
+      }
+      setPrompt(data.result.trim());
+      toast.success('Prompt mejorado con IA');
+    } catch (err) {
+      toast.error('Error al mejorar: ' + (err as Error).message);
+    } finally {
+      setIsImproving(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (prompt.trim().length < 10) {
       toast.error('El prompt debe tener al menos 10 caracteres.');
@@ -68,6 +107,7 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
     try {
       setIsGenerating(true);
       setResult(null);
+      setImageLoadError(false);
       const { data: { session } } = await supabase.auth.getSession();
       const endpoint = isVideo ? 'generate-video' : 'generate-image';
       const body = isVideo
@@ -130,8 +170,20 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
           <div>
             <div className="flex items-center justify-between mb-3">
               <label className="text-sm font-bold text-white">Tu prompt</label>
-              <button className="flex items-center gap-1.5 text-[11px] font-bold text-primary hover:text-primaryhover transition-colors">
-                <Sparkles className="w-3.5 h-3.5" /> Mejorar con IA
+              <button
+                onClick={handleImprovePrompt}
+                disabled={isImproving || prompt.trim().length < 5}
+                className={`flex items-center gap-1.5 text-[11px] font-bold transition-colors ${
+                  isImproving || prompt.trim().length < 5
+                    ? 'text-gray-600 cursor-not-allowed'
+                    : 'text-primary hover:text-primaryhover'
+                }`}
+              >
+                {isImproving ? (
+                  <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Mejorando...</>
+                ) : (
+                  <><Sparkles className="w-3.5 h-3.5" /> Mejorar con IA</>
+                )}
               </button>
             </div>
             <textarea
@@ -294,7 +346,27 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
             <div className="mt-4 p-3 bg-background border border-white/10 rounded-xl">
               {result.kind === 'image' && (
                 <>
-                  <img src={result.url} alt="Resultado" className="w-full rounded-lg mb-2" />
+                  {imageLoadError ? (
+                    <div className="w-full rounded-lg mb-2 p-4 bg-amber-500/5 border border-amber-500/20 text-center">
+                      <p className="text-xs text-amber-300 mb-2">
+                        La imagen se generó pero el navegador no pudo mostrarla aquí.
+                      </p>
+                      <a href={result.url} target="_blank" rel="noreferrer"
+                        className="text-xs text-primary underline break-all">
+                        Abrir imagen en nueva pestaña
+                      </a>
+                    </div>
+                  ) : (
+                    <img
+                      src={result.url}
+                      alt="Resultado"
+                      className="w-full rounded-lg mb-2"
+                      onError={() => {
+                        console.error('Image failed to load:', result.url);
+                        setImageLoadError(true);
+                      }}
+                    />
+                  )}
                   <a href={result.url} target="_blank" rel="noreferrer" download
                     className="flex items-center justify-center gap-2 w-full py-2 text-xs font-bold text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
                     <Download className="w-3.5 h-3.5" /> Descargar
