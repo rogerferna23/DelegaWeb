@@ -1,4 +1,7 @@
 // /functions/generate-image/index.ts
+//
+// Generación de imágenes a través de FAL.ai (todos los modelos del catálogo
+// pasan por la misma cuenta de FAL — una sola API key, una sola recarga).
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -6,15 +9,50 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
+const falKey = Deno.env.get("FAL_KEY")!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Validar input
-const GenerateImageSchema = z.object({
-  prompt: z.string().min(10).max(1000),
-  dimensions: z.enum(["512x512", "1024x1024", "1792x1024"]).default("1024x1024"),
-  quality: z.enum(["standard", "hd"]).default("hd"),
+// ── Mapeo: ID del catálogo (modelsData.ts) → modelo real de FAL.ai ──────────
+// Solo aquí se cambia para añadir/migrar modelos. Si llega un id no listado,
+// se usa flux-schnell como fallback (rápido y barato).
+const FAL_IMAGE_MODELS: Record<string, string> = {
+  "recraft-v3":       "fal-ai/recraft-v3",
+  "flux-2-pro":       "fal-ai/flux-pro/v1.1-ultra",
+  "flux-1-1-pro":     "fal-ai/flux-pro/v1.1",
+  "flux-schnell":     "fal-ai/flux/schnell",
+  "flux-kontext-pro": "fal-ai/flux-pro/kontext",
+  "nano-banana-2":    "fal-ai/imagen4/preview",
+  "nano-banana-pro":  "fal-ai/imagen4/preview",
+  "seedream-4-5":     "fal-ai/bytedance/seedream/v3/text-to-image",
+  "gpt-image-1-5":    "fal-ai/flux-pro/v1.1",      // FAL no tiene gpt-image; usamos Flux Pro como equivalente
+  "grok-imagine":     "fal-ai/flux/schnell",       // fallback económico
+};
+const FALLBACK_IMAGE_MODEL = "fal-ai/flux/schnell";
+
+// Algunos modelos esperan "image_size" (presets) y otros "aspect_ratio".
+// Esta función decide el formato según el modelo destino.
+function buildSizeParams(falModel: string, aspectRatio: string) {
+  // Modelos que usan image_size con presets de FAL
+  if (falModel.startsWith("fal-ai/flux/") || falModel.startsWith("fal-ai/recraft")) {
+    const sizeMap: Record<string, string> = {
+      "1:1":  "square_hd",
+      "16:9": "landscape_16_9",
+      "9:16": "portrait_16_9",
+      "4:3":  "landscape_4_3",
+      "3:4":  "portrait_4_3",
+    };
+    return { image_size: sizeMap[aspectRatio] ?? "square_hd" };
+  }
+  // Modelos que aceptan aspect_ratio directo (Flux Pro v1.1, Imagen, Seedream)
+  return { aspect_ratio: aspectRatio || "1:1" };
+}
+
+const Schema = z.object({
+  prompt: z.string().min(10).max(2000),
+  modelId: z.string().default("flux-schnell"),
+  aspectRatio: z.enum(["1:1", "16:9", "9:16", "4:3", "3:4"]).default("1:1"),
+  numImages: z.number().int().min(1).max(4).default(1),
 });
 
 serve(async (req: Request) => {
@@ -23,33 +61,22 @@ serve(async (req: Request) => {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
-
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // 1. Autenticar usuario
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
+    // 1. Auth
+    const token = req.headers.get("Authorization")?.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
     // 2. Validar input
     const body = await req.json();
-    const { prompt, dimensions, quality } = GenerateImageSchema.parse(body);
+    const { prompt, modelId, aspectRatio, numImages } = Schema.parse(body);
+    const falModel = FAL_IMAGE_MODELS[modelId] ?? FALLBACK_IMAGE_MODEL;
 
-    // 3. Crear registro de request
+    // 3. Crear request en BD
     const { data: request, error: requestError } = await supabase
       .from("creative_requests")
       .insert({
@@ -60,39 +87,35 @@ serve(async (req: Request) => {
       })
       .select()
       .single();
+    if (requestError) throw requestError;
 
-    if (requestError) {
-      throw requestError;
+    // 4. Llamar a FAL.ai (sync — las imágenes tardan 5-30s)
+    const sizeParams = buildSizeParams(falModel, aspectRatio);
+    const falResponse = await fetch(`https://fal.run/${falModel}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Key ${falKey}`,
+      },
+      body: JSON.stringify({
+        prompt,
+        num_images: numImages,
+        ...sizeParams,
+      }),
+    });
+
+    if (!falResponse.ok) {
+      const errText = await falResponse.text();
+      throw new Error(`FAL error (${falResponse.status}): ${errText}`);
     }
+    const falData = await falResponse.json();
 
-    // 4. Llamar a DALL-E 3
-    const dalleResponse = await fetch(
-      "https://api.openai.com/v1/images/generations",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: "dall-e-3",
-          prompt: prompt,
-          n: 1,
-          size: dimensions,
-          quality: quality,
-          style: "natural",
-        }),
-      }
-    );
-
-    if (!dalleResponse.ok) {
-      const error = await dalleResponse.json();
-      throw new Error(`DALL-E error: ${error.error.message}`);
+    // FAL devuelve { images: [{ url }] } en la mayoría de modelos
+    const images: Array<{ url: string }> = falData.images ?? [];
+    if (images.length === 0) {
+      throw new Error("FAL no devolvió imágenes");
     }
-
-    const dalleData = await dalleResponse.json();
-    const imageUrl = dalleData.data[0].url;
-    const dalleRequestId = dalleData.data[0].revised_prompt;
+    const imageUrl = images[0].url;
 
     // 5. Guardar imagen en BD
     const { data: image, error: imageError } = await supabase
@@ -101,52 +124,33 @@ serve(async (req: Request) => {
         user_id: user.id,
         request_id: request.id,
         image_url: imageUrl,
-        dalle_request_id: dalleRequestId,
+        dalle_request_id: modelId, // reusamos columna existente para guardar el modelo usado
         prompt,
-        dimensions,
-        quality,
+        dimensions: aspectRatio,
+        quality: "hd",
       })
       .select()
       .single();
+    if (imageError) throw imageError;
 
-    if (imageError) {
-      throw imageError;
-    }
-
-    // 6. Actualizar request como completado
+    // 6. Marcar request como completado
     await supabase
       .from("creative_requests")
-      .update({
-        status: "completed",
-        result_id: image.id,
-        completed_at: new Date(),
-      })
+      .update({ status: "completed", result_id: image.id, completed_at: new Date() })
       .eq("id", request.id);
 
     return new Response(
       JSON.stringify({
         ok: true,
-        image: {
-          id: image.id,
-          url: imageUrl,
-          prompt,
-        },
+        image: { id: image.id, url: imageUrl, prompt, model: modelId },
       }),
-      { status: 201, headers: corsHeaders }
+      { status: 201, headers: corsHeaders },
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return new Response(
-        JSON.stringify({ error: "Invalid input", details: error.errors }),
-        { status: 400, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "Invalid input", details: error.errors }), { status: 400, headers: corsHeaders });
     }
-
-    console.error("Error:", error);
-
-    return new Response(
-      JSON.stringify({ error: error.message || "Server error" }),
-      { status: 500, headers: corsHeaders }
-    );
+    console.error("generate-image error:", error);
+    return new Response(JSON.stringify({ error: error.message || "Server error" }), { status: 500, headers: corsHeaders });
   }
 });

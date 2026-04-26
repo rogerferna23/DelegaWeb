@@ -9,18 +9,18 @@ import VideoProcessing from './VideoProcessing';
 
 interface TaskInfo {
   id: string;
-  runway_project_id: string;
 }
 
 interface Props {
   onBack: () => void;
   initialPrompt?: string;
+  modelId?: string;
 }
 
-export default function GenerarVideoModal({ onBack, initialPrompt = '' }: Props) {
+export default function GenerarVideoModal({ onBack, initialPrompt = '', modelId = 'kling-2-5-turbo' }: Props) {
   const toast = useToast();
   const [prompt, setPrompt] = useState(initialPrompt);
-  const [duration, setDuration] = useState('15');
+  const [duration, setDuration] = useState('5');
   const [isGenerating, setIsGenerating] = useState(false);
   const [taskInfo, setTaskInfo] = useState<TaskInfo | null>(null);
 
@@ -37,7 +37,12 @@ export default function GenerarVideoModal({ onBack, initialPrompt = '' }: Props)
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ prompt, duration }),
+        body: JSON.stringify({
+          prompt,
+          modelId,
+          duration: parseInt(duration, 10),
+          aspectRatio: '16:9',
+        }),
       });
 
       const data = await response.json();
@@ -56,7 +61,6 @@ export default function GenerarVideoModal({ onBack, initialPrompt = '' }: Props)
     return (
       <VideoProcessing
         videoId={taskInfo.id}
-        runwayProjectId={taskInfo.runway_project_id}
         onBack={onBack}
       />
     );
@@ -81,7 +85,7 @@ export default function GenerarVideoModal({ onBack, initialPrompt = '' }: Props)
             </div>
             <h2 className="text-3xl font-bold text-white mb-3">Generador de Video Pro</h2>
             <p className="text-gray-500 text-sm max-w-md leading-relaxed">
-              Crea contenido audiovisual de impacto con tecnología de Runway ML. Ideal para anuncios de Meta e historias de alto impacto.
+              Crea contenido audiovisual de impacto con FAL.ai (Kling, Veo, Seedance, Hailuo y más). Ideal para anuncios de Meta e historias de alto impacto.
             </p>
           </div>
 
@@ -105,7 +109,7 @@ export default function GenerarVideoModal({ onBack, initialPrompt = '' }: Props)
               <div>
                 <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-4 px-1">Duración del Clip</label>
                 <div className="grid grid-cols-4 gap-3">
-                  {['15', '30', '45', '60'].map(d => (
+                  {['5', '10', '15', '20'].map(d => (
                     <button
                       key={d}
                       onClick={() => setDuration(d)}
@@ -128,7 +132,7 @@ export default function GenerarVideoModal({ onBack, initialPrompt = '' }: Props)
                   <div>
                     <h5 className="text-white font-bold text-xs">Aviso técnico</h5>
                     <p className="text-[10px] text-gray-400 mt-1 leading-relaxed">
-                      La generación de video toma de 2 a 5 minutos. Te avisaremos cuando esté listo. Puedes cerrar esta ventana y volver más tarde.
+                      La generación de video toma de 1 a 5 minutos. Te avisaremos cuando esté listo. Puedes cerrar esta ventana y volver más tarde.
                     </p>
                   </div>
                 </div>
@@ -156,7 +160,7 @@ export default function GenerarVideoModal({ onBack, initialPrompt = '' }: Props)
                 )}
               </button>
               <div className="mt-5 flex items-center justify-center gap-6 text-[10px] text-gray-600">
-                <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Motor Runway Gen-3</span>
+                <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Modelo: {modelId}</span>
                 <span className="flex items-center gap-1.5 font-bold text-orange-400"><RefreshCw className="w-3.5 h-3.5" /> 5 Créditos</span>
               </div>
             </div>

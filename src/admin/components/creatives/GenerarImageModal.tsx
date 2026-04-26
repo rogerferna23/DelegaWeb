@@ -17,9 +17,17 @@ interface ImageResult {
 interface Props {
   onBack: () => void;
   initialPrompt?: string;
+  modelId?: string;
 }
 
-export default function GenerarImageModal({ onBack, initialPrompt = '' }: Props) {
+// Mapa interno: "1024x1024" → "1:1" (compat con la UI antigua de dimensiones)
+const dimensionToAspect: Record<string, string> = {
+  '1024x1024': '1:1',
+  '1792x1024': '16:9',
+  '1024x1792': '9:16',
+};
+
+export default function GenerarImageModal({ onBack, initialPrompt = '', modelId = 'flux-schnell' }: Props) {
   const toast = useToast();
   const [prompt, setPrompt] = useState(initialPrompt);
   const [dimensions, setDimensions] = useState('1024x1024');
@@ -45,7 +53,11 @@ export default function GenerarImageModal({ onBack, initialPrompt = '' }: Props)
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ prompt, dimensions, quality }),
+        body: JSON.stringify({
+          prompt,
+          modelId,
+          aspectRatio: dimensionToAspect[dimensions] ?? '1:1',
+        }),
       });
 
       const data = await response.json();
@@ -128,7 +140,7 @@ export default function GenerarImageModal({ onBack, initialPrompt = '' }: Props)
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { l: 'Standard', v: 'standard', d: 'Rápido y eficiente' },
-                      { l: 'Alta Definición', v: 'hd', d: 'Máximo detalle (DALL-E 3)' },
+                      { l: 'Alta Definición', v: 'hd', d: 'Máximo detalle' },
                     ].map(q => (
                       <button
                         key={q.v}
@@ -192,7 +204,7 @@ export default function GenerarImageModal({ onBack, initialPrompt = '' }: Props)
                   )}
                 </button>
                 <div className="mt-4 flex items-center justify-center gap-4 text-[10px] text-gray-600">
-                  <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Basado en DALL-E 3</span>
+                  <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Modelo: {modelId}</span>
                   <span className="flex items-center gap-1 font-bold text-primary"><RefreshCw className="w-3 h-3" /> 1 Crédito por generación</span>
                 </div>
               </div>
@@ -249,7 +261,7 @@ export default function GenerarImageModal({ onBack, initialPrompt = '' }: Props)
                 </h4>
                 <p className="text-xs text-gray-500 max-w-[280px] leading-relaxed">
                   {isGenerating
-                    ? 'Estamos usando DALL-E 3 para crear una imagen única. Esto suele tomar de 5 a 10 segundos.'
+                    ? 'Estamos usando FAL.ai para crear una imagen única. Esto suele tomar de 5 a 30 segundos.'
                     : 'Ingresa una descripción detallada en el panel de la izquierda y presiona "Generar Imagen" para ver la magia.'}
                 </p>
                 {isGenerating && (
