@@ -133,9 +133,11 @@ function readCachedSession(): { id: string; email?: string } | null {
     const parsed = JSON.parse(raw);
     const user = parsed?.user ?? parsed?.session?.user;
     if (!user?.id) return null;
-    // Discard if access token is expired
+    // Strict expiry check: reject if missing or expired (with 30s safety margin).
+    // Without this, stale tokens left over from a previous logout would briefly
+    // flash the dashboard before initSession() invalidates them.
     const exp: number | undefined = parsed?.expires_at ?? parsed?.session?.expires_at;
-    if (exp && exp * 1000 < Date.now()) return null;
+    if (!exp || exp * 1000 < Date.now() + 30_000) return null;
     return { id: user.id, email: user.email };
   } catch {
     return null;
@@ -266,18 +268,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
 
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-        if (session) await applySession(session.user);
-        else {
-          // No active session — clear any stale tokens and show login
-          try {
-            Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
-          } catch { /* ignore */ }
+        if (session) {
+          await applySession(session.user);
+        } else {
+          // No active session — show login. Don't wipe localStorage here;
+          // Supabase manages its own tokens and SIGNED_OUT will clean up.
           setCurrentUser(null);
           setLoading(false);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("AuthContext: Error o timeout al inicializar sesión:", msg);
+        // On timeout, clear potentially stale tokens so the next login starts clean.
         try {
           Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
         } catch { /* ignore */ }
@@ -296,21 +298,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, 10000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        try {
-          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1' && event !== 'SIGNED_OUT') {
-            setLoading(false);
-            return;
-          }
-        } catch (mfaErr) {
-          console.warn("AuthContext: Error checking AAL in state change:", mfaErr);
-        }
-        await applySession(session.user);
-      } else {
+      // SIGNED_OUT is the ONLY event that should clear the user. Other null-session
+      // events (INITIAL_SESSION fired before getSession() resolves, spurious
+      // refresh events) used to wipe the just-logged-in user — that's the
+      // "panel → login flash" bug.
+      if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
+        setUsers([]);
+        setPendingRequests([]);
         setLoading(false);
+        return;
       }
+
+      // Ignore events without session (e.g. INITIAL_SESSION fired with null).
+      // initSession() is the source of truth for the initial state.
+      if (!session) return;
+
+      try {
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aal?.nextLevel === 'aal2' && aal?.currentLevel === 'aal1') {
+          setLoading(false);
+          return;
+        }
+      } catch (mfaErr) {
+        console.warn("AuthContext: Error checking AAL in state change:", mfaErr);
+      }
+      await applySession(session.user);
     });
 
     return () => {
