@@ -44,7 +44,19 @@
       "Bash(find src *)",
       "mcp__Claude_in_Chrome__tabs_context_mcp",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'feat: actualizar favicon con logo DW de DelegaWeb' --body ' *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); const {createClient}=require\\('@supabase/supabase-js'\\); const s=createClient\\(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY\\); s.from\\('sofia_messages'\\).select\\('count'\\).then\\(r=>console.log\\(r.error?'ERROR:'+r.error.message:'OK - tablas accesibles'\\)\\)\")",
+      "Bash(node -e \"require\\('dotenv'\\).config\\({path:'C:/Users/Usuario/Documents/Delega/delegaweb/Sofia-IA/.env'}\\); console.log\\('URL:', process.env.SUPABASE_URL ? 'OK' : 'FALTA'\\); console.log\\('KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'OK' : 'FALTA'\\)\")",
+      "Bash(pm2 start *)",
+      "Bash(pm2 save *)",
+      "Bash(pm2-startup install *)",
+      "Bash(git commit -m 'fix: corregir model IDs de Claude incorrectos/obsoletos *)",
+      "PowerShell(Get-Command scoop -ErrorAction SilentlyContinue)",
+      "Bash(npx supabase *)",
+      "Bash(git commit -m 'chore: actualizar package-lock de Sofia-IA y permisos locales *)"
     ]
   }
 }
