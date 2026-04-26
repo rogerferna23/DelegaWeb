@@ -116,14 +116,48 @@ function generateTempPassword(): string {
   return Array.from(bytes, b => chars[b % chars.length]).join('');
 }
 
+// ── Cached session ────────────────────────────────────────────────────────────
+
+// Reads the Supabase session from localStorage synchronously so the app never
+// blocks on a network call just to know if the user is logged in.
+function readCachedSession(): { id: string; email?: string } | null {
+  try {
+    const prefix = 'sb-';
+    const suffix = '-auth-token';
+    const key = Object.keys(localStorage).find(
+      k => k.startsWith(prefix) && k.endsWith(suffix)
+    );
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const user = parsed?.user ?? parsed?.session?.user;
+    if (!user?.id) return null;
+    // Discard if access token is expired
+    const exp: number | undefined = parsed?.expires_at ?? parsed?.session?.expires_at;
+    if (exp && exp * 1000 < Date.now()) return null;
+    return { id: user.id, email: user.email };
+  } catch {
+    return null;
+  }
+}
+
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    // Initialize from cache so the app never shows a loading screen when the
+    // user is already logged in. applySession() will overwrite this with the
+    // real profile (name, role) once the network responds.
+    const cached = readCachedSession();
+    if (!cached) return null;
+    return { id: cached.id, email: cached.email, role: 'admin', name: cached.email?.split('@')[0] || '' };
+  });
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [pendingRequests, setPendingRequests] = useState<AdminRequest[]>([]);
   const [allRequests, setAllRequests] = useState<AdminRequest[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Skip the loading screen when the cache already tells us the user is logged in.
+  const [loading, setLoading] = useState(() => !readCachedSession());
 
   const fetchProfile = async (user: { id: string }): Promise<UserProfile | null> => {
     try {
@@ -228,15 +262,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('INIT_TIMEOUT')), 15000)
+          setTimeout(() => reject(new Error('INIT_TIMEOUT')), 8000)
         );
 
         const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
         if (session) await applySession(session.user);
-        else setLoading(false);
+        else {
+          // No active session — clear any stale tokens and show login
+          try {
+            Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+          } catch { /* ignore */ }
+          setCurrentUser(null);
+          setLoading(false);
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("AuthContext: Error o timeout al inicializar sesión:", msg);
+        try {
+          Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k));
+        } catch { /* ignore */ }
+        setCurrentUser(null);
         setLoading(false);
       }
     };
@@ -248,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (prev) console.warn("AuthContext: Forzando fin de carga por hard-timeout.");
         return false;
       });
-    }, 18000);
+    }, 10000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
