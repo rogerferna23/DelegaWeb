@@ -29,10 +29,18 @@ serve(async (req: Request) => {
       throw new Error('No autorizado: Sin token');
     }
 
-    const { systemPrompt, userPrompt } = await req.json();
+    const body = await req.json();
+    const { systemPrompt, userPrompt } = body;
 
     if (!systemPrompt || !userPrompt) {
       throw new Error('Faltan prompts requeridos (systemPrompt, userPrompt)');
+    }
+
+    if (typeof systemPrompt !== 'string' || systemPrompt.length > 8000) {
+      throw new Error('systemPrompt inválido o demasiado largo');
+    }
+    if (typeof userPrompt !== 'string' || userPrompt.length > 4000) {
+      throw new Error('userPrompt inválido o demasiado largo');
     }
 
     const supabase = createClient(

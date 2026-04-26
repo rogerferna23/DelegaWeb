@@ -54,6 +54,12 @@ async function handleMessage(client, msg) {
 
   // --- COMANDO SECRETO PARA PROBAR REPORTES ---
   if (userText.toLowerCase() === '!testreport') {
+    const senderNumber = contact.number || chatId.replace('@c.us', '');
+    const isAdmin = config.ADMIN_NUMBERS.some(n => n && senderNumber.includes(n));
+    if (!isAdmin) {
+      console.log(`[Test] !testreport rechazado — no es admin: ${senderNumber}`);
+      return;
+    }
     console.log('[Test] Triggering test report...');
     await notifyRoger(client, { 
       contactName,

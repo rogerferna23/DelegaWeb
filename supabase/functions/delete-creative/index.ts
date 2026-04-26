@@ -14,13 +14,25 @@ const DeleteCreativeSchema = z.object({
   creative_type: z.enum(["image", "video"]),
 });
 
-serve(async (req: Request) => {
-  const corsHeaders = {
-    "Access-Control-Allow-Origin": "*",
+const ALLOWED_ORIGINS = [
+  "https://delegaweb.com",
+  "https://www.delegaweb.com",
+  "https://delega-web.vercel.app",
+  "http://localhost:5173",
+];
+function buildCors(req: Request): HeadersInit {
+  const origin = req.headers.get("origin") ?? "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
     "Access-Control-Allow-Methods": "DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Vary": "Origin",
   };
+}
 
+serve(async (req: Request) => {
+  const corsHeaders = buildCors(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

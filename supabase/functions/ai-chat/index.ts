@@ -45,7 +45,10 @@ serve(async (req: Request) => {
     
     if (authError || !user) {
       console.error("Auth: Error validando usuario:", authError?.message || "Usuario nulo");
-      throw new Error(`No autorizado: Sesión inválida (${authError?.message || 'NULL'})`);
+      return new Response(JSON.stringify({ error: "No autorizado" }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
     }
 
     console.log(`Auth: Usuario validado -> ${user.id}`);
