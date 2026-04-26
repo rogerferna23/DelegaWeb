@@ -1,4 +1,7 @@
 // /functions/generate-video/index.ts
+//
+// Generación de video vía FAL.ai (queue async). Devuelve un request_id
+// que el frontend usa para hacer polling con check-video-status.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -6,13 +9,53 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const runwayKey = Deno.env.get("RUNWAY_API_KEY")!;
+const falKey = Deno.env.get("FAL_KEY")!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const GenerateVideoSchema = z.object({
-  prompt: z.string().min(10).max(1000),
-  duration: z.enum(["15", "30", "45", "60"]).default("30"),
+// ── Mapeo: ID del catálogo (modelsData.ts) → modelo real de FAL.ai ──────────
+const FAL_VIDEO_MODELS: Record<string, string> = {
+  "seedance-2-0":     "fal-ai/bytedance/seedance/v1/lite/text-to-video",
+  "seedance-1-5-pro": "fal-ai/bytedance/seedance/v1/pro/text-to-video",
+  "kling-3-0-pro":    "fal-ai/kling-video/v2.1/pro/text-to-video",
+  "kling-2-5-turbo":  "fal-ai/kling-video/v2.1/standard/text-to-video",
+  "veo-3-1":          "fal-ai/veo3",
+  "veo-3":            "fal-ai/veo3",
+  "sora-2-pro":       "fal-ai/kling-video/v2.1/pro/text-to-video", // FAL no expone Sora; usamos Kling Pro
+  "hailuo-2-3":       "fal-ai/minimax/video-01",
+  "wan-2-5":          "fal-ai/wan-i2v",
+  "pixverse-v5-6":    "fal-ai/pixverse/v4.5",
+};
+const FALLBACK_VIDEO_MODEL = "fal-ai/kling-video/v2.1/standard/text-to-video";
+
+// Cada modelo de video usa parámetros distintos. Normalizamos aquí.
+function buildVideoBody(falModel: string, prompt: string, duration: number, aspectRatio: string) {
+  const ar = aspectRatio || "16:9";
+
+  if (falModel.includes("kling-video")) {
+    return { prompt, duration: String(duration <= 5 ? 5 : 10), aspect_ratio: ar };
+  }
+  if (falModel.includes("minimax")) {
+    return { prompt, prompt_optimizer: true };
+  }
+  if (falModel.includes("seedance")) {
+    return { prompt, duration: String(duration), aspect_ratio: ar, resolution: "1080p" };
+  }
+  if (falModel.includes("veo3")) {
+    return { prompt, aspect_ratio: ar };
+  }
+  if (falModel.includes("pixverse")) {
+    return { prompt, aspect_ratio: ar, duration: String(duration <= 5 ? 5 : 8) };
+  }
+  // Default genérico
+  return { prompt, aspect_ratio: ar, duration: String(duration) };
+}
+
+const Schema = z.object({
+  prompt: z.string().min(10).max(2000),
+  modelId: z.string().default("kling-2-5-turbo"),
+  duration: z.number().int().min(3).max(30).default(5),
+  aspectRatio: z.enum(["1:1", "16:9", "9:16", "4:3", "3:4"]).default("16:9"),
 });
 
 serve(async (req: Request) => {
@@ -21,110 +64,77 @@ serve(async (req: Request) => {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   };
-
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    // 1. Autenticar
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
-    
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
+    const token = req.headers.get("Authorization")?.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: corsHeaders }
-      );
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    // 2. Validar input
     const body = await req.json();
-    const { prompt, duration } = GenerateVideoSchema.parse(body);
+    const { prompt, modelId, duration, aspectRatio } = Schema.parse(body);
+    const falModel = FAL_VIDEO_MODELS[modelId] ?? FALLBACK_VIDEO_MODEL;
 
-    // 3. Crear request en BD
+    // 1. Crear request en BD
     const { data: request, error: requestError } = await supabase
       .from("creative_requests")
-      .insert({
-        user_id: user.id,
-        creative_type: "video",
-        prompt,
-        status: "processing",
-      })
+      .insert({ user_id: user.id, creative_type: "video", prompt, status: "processing" })
       .select()
       .single();
+    if (requestError) throw requestError;
 
-    if (requestError) {
-      throw requestError;
+    // 2. Encolar en FAL.ai
+    const falPayload = buildVideoBody(falModel, prompt, duration, aspectRatio);
+    const falResponse = await fetch(`https://queue.fal.run/${falModel}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Key ${falKey}` },
+      body: JSON.stringify(falPayload),
+    });
+
+    if (!falResponse.ok) {
+      const errText = await falResponse.text();
+      throw new Error(`FAL queue error (${falResponse.status}): ${errText}`);
     }
+    const falData = await falResponse.json();
+    const requestId = falData.request_id;
+    if (!requestId) throw new Error("FAL no devolvió request_id");
 
-    // 4. Llamar a Runway ML API
-    const runwayResponse = await fetch(
-      "https://api.runwayml.com/v1/tasks",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${runwayKey}`,
-        },
-        body: JSON.stringify({
-          type: "gen3a_turbo",
-          input: {
-            prompt_text: prompt,
-            duration: parseInt(duration),
-          },
-        }),
-      }
-    );
-
-    if (!runwayResponse.ok) {
-      const error = await runwayResponse.json();
-      throw new Error(`Runway error: ${error.message}`);
-    }
-
-    const runwayData = await runwayResponse.json();
-    const projectId = runwayData.id;
-
-    // 5. Guardar en BD
+    // 3. Guardar metadata en BD (reusamos runway_project_id para el FAL request_id)
     const { data: video, error: videoError } = await supabase
       .from("generated_videos")
       .insert({
         user_id: user.id,
         request_id: request.id,
-        runway_project_id: projectId,
+        runway_project_id: requestId,
+        model_id: falModel,
         prompt,
-        duration_seconds: parseInt(duration),
+        duration_seconds: duration,
         status: "processing",
       })
       .select()
       .single();
-
-    if (videoError) {
-      throw videoError;
-    }
+    if (videoError) throw videoError;
 
     return new Response(
       JSON.stringify({
         ok: true,
         video: {
           id: video.id,
-          runway_project_id: projectId,
+          fal_request_id: requestId,
+          fal_model: falModel,
           status: "processing",
-          message: "El video se está generando. Esto toma 2-5 minutos.",
+          message: "El video se está generando. Esto toma 1-5 minutos.",
         },
       }),
-      { status: 201, headers: corsHeaders }
+      { status: 201, headers: corsHeaders },
     );
   } catch (error) {
-    console.error("Error:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Server error" }),
-      { status: 500, headers: corsHeaders }
-    );
+    if (error instanceof z.ZodError) {
+      return new Response(JSON.stringify({ error: "Invalid input", details: error.errors }), { status: 400, headers: corsHeaders });
+    }
+    console.error("generate-video error:", error);
+    return new Response(JSON.stringify({ error: error.message || "Server error" }), { status: 500, headers: corsHeaders });
   }
 });

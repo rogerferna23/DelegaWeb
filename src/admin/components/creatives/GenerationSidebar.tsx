@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { X, Sparkles, Upload, ChevronRight, ChevronDown, Zap } from 'lucide-react';
+import { X, Sparkles, Upload, ChevronRight, ChevronDown, Zap, Loader2, Download } from 'lucide-react';
 import { IMAGE_MODELS, VIDEO_MODELS } from '../../data/modelsData';
 import type { CreativePreset } from '../../data/modelsData';
+import { supabase } from '../../../lib/supabase';
+import { useToast } from '../../../contexts/ToastContext';
 
 interface Props {
   isOpen: boolean;
@@ -12,13 +14,21 @@ interface Props {
   selectedModelId: string;
 }
 
+type Result =
+  | { kind: 'image'; url: string }
+  | { kind: 'video'; videoId: string; url?: string; status: 'processing' | 'completed' | 'failed' };
+
 export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, onOpenModelSelector, selectedModelId }: Props) {
+  const toast = useToast();
   const [prompt, setPrompt] = useState('');
   const [aspectRatio, setAspectRatio] = useState('16:9');
   const [variations, setVariations] = useState(1);
   const [duration, setDuration] = useState(8);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [result, setResult] = useState<Result | null>(null);
 
-  const allModels = mediaType === 'imagen' ? IMAGE_MODELS : VIDEO_MODELS;
+  const isVideo = mediaType === 'video' || mediaType === 'img2vid';
+  const allModels = isVideo ? VIDEO_MODELS : IMAGE_MODELS;
   const currentModel = allModels.find(m => m.id === selectedModelId) || allModels[0];
 
   useEffect(() => {
@@ -26,6 +36,63 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
       setPrompt((preset as Record<string, unknown>).imageDesc as string || '');
     }
   }, [preset]);
+
+  // Polling para video cuando el status es 'processing'
+  useEffect(() => {
+    if (!result || result.kind !== 'video' || result.status !== 'processing') return;
+    const intervalId = setInterval(async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-video-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ videoId: result.videoId }),
+        });
+        const data = await r.json();
+        if (data.status === 'completed' && data.videoUrl) {
+          setResult({ kind: 'video', videoId: result.videoId, url: data.videoUrl, status: 'completed' });
+        } else if (data.status === 'failed') {
+          setResult({ kind: 'video', videoId: result.videoId, status: 'failed' });
+          toast.error('La generación de video falló.');
+        }
+      } catch (err) { console.error(err); }
+    }, 8000);
+    return () => clearInterval(intervalId);
+  }, [result, toast]);
+
+  const handleGenerate = async () => {
+    if (prompt.trim().length < 10) {
+      toast.error('El prompt debe tener al menos 10 caracteres.');
+      return;
+    }
+    try {
+      setIsGenerating(true);
+      setResult(null);
+      const { data: { session } } = await supabase.auth.getSession();
+      const endpoint = isVideo ? 'generate-video' : 'generate-image';
+      const body = isVideo
+        ? { prompt, modelId: selectedModelId, duration, aspectRatio }
+        : { prompt, modelId: selectedModelId, aspectRatio, numImages: variations };
+
+      const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!data.ok) throw new Error(data.error || 'Error desconocido');
+
+      if (isVideo) {
+        setResult({ kind: 'video', videoId: data.video.id, status: 'processing' });
+      } else {
+        setResult({ kind: 'image', url: data.image.url });
+      }
+    } catch (err) {
+      toast.error('Error al generar: ' + (err as Error).message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -207,9 +274,53 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
             </span>
           </div>
 
-          <button className="w-full py-4 bg-primary hover:bg-primaryhover text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 transform active:scale-[0.98]">
-            <Zap className="w-4 h-4" /> Generar
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating || prompt.trim().length < 10}
+            className={`w-full py-4 font-bold text-sm rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 transform active:scale-[0.98] ${
+              isGenerating || prompt.trim().length < 10
+                ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                : 'bg-primary hover:bg-primaryhover text-white shadow-primary/20'
+            }`}
+          >
+            {isGenerating ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Generando...</>
+            ) : (
+              <><Zap className="w-4 h-4" /> Generar</>
+            )}
           </button>
+
+          {result && (
+            <div className="mt-4 p-3 bg-background border border-white/10 rounded-xl">
+              {result.kind === 'image' && (
+                <>
+                  <img src={result.url} alt="Resultado" className="w-full rounded-lg mb-2" />
+                  <a href={result.url} target="_blank" rel="noreferrer" download
+                    className="flex items-center justify-center gap-2 w-full py-2 text-xs font-bold text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+                    <Download className="w-3.5 h-3.5" /> Descargar
+                  </a>
+                </>
+              )}
+              {result.kind === 'video' && result.status === 'processing' && (
+                <p className="text-xs text-gray-400 text-center py-3 flex items-center justify-center gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Renderizando video... (1-5 min)
+                </p>
+              )}
+              {result.kind === 'video' && result.status === 'completed' && result.url && (
+                <>
+                  <video src={result.url} controls autoPlay className="w-full rounded-lg mb-2" />
+                  <a href={result.url} target="_blank" rel="noreferrer" download
+                    className="flex items-center justify-center gap-2 w-full py-2 text-xs font-bold text-white bg-white/5 hover:bg-white/10 rounded-lg transition-colors">
+                    <Download className="w-3.5 h-3.5" /> Descargar
+                  </a>
+                </>
+              )}
+              {result.kind === 'video' && result.status === 'failed' && (
+                <p className="text-xs text-red-400 text-center py-3">La generación falló. Inténtalo de nuevo.</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>

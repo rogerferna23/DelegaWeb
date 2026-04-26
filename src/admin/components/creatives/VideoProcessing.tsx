@@ -10,11 +10,10 @@ type VideoStatus = 'processing' | 'completed' | 'failed';
 
 interface Props {
   videoId: string;
-  runwayProjectId: string;
   onBack: () => void;
 }
 
-export default function VideoProcessing({ videoId, runwayProjectId, onBack }: Props) {
+export default function VideoProcessing({ videoId, onBack }: Props) {
   const [status, setStatus] = useState<VideoStatus>('processing');
   const [progress, setProgress] = useState(10);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -33,7 +32,7 @@ export default function VideoProcessing({ videoId, runwayProjectId, onBack }: Pr
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session?.access_token}`,
           },
-          body: JSON.stringify({ videoId, runwayProjectId }),
+          body: JSON.stringify({ videoId }),
         });
 
         const data = await response.json();
@@ -61,7 +60,7 @@ export default function VideoProcessing({ videoId, runwayProjectId, onBack }: Pr
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [status, videoId, runwayProjectId]);
+  }, [status, videoId]);
 
   const handleSave = async () => {
     if (!videoUrl || saved) return;
@@ -79,7 +78,7 @@ export default function VideoProcessing({ videoId, runwayProjectId, onBack }: Pr
         body: JSON.stringify({
           creative_id: videoId,
           creative_type: 'video',
-          name: 'Video Generado con Runway ML',
+          name: 'Video Generado con IA',
         }),
       });
 
@@ -112,7 +111,7 @@ export default function VideoProcessing({ videoId, runwayProjectId, onBack }: Pr
 
             <h2 className="text-3xl font-bold text-white mb-4">Estamos produciendo tu video</h2>
             <p className="text-gray-500 text-sm max-w-md mx-auto leading-relaxed mb-10">
-              Runway ML Gen-3 está renderizando cada fotograma. Esto suele tardar entre 2 y 5 minutos. No es necesario que te quedes en esta pantalla.
+              FAL.ai está renderizando cada fotograma. Esto suele tardar entre 1 y 5 minutos. No es necesario que te quedes en esta pantalla.
             </p>
 
             <div className="w-full max-w-md bg-white/5 h-2 rounded-full overflow-hidden mb-12">

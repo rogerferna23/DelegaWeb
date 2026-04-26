@@ -72,7 +72,7 @@ serve(async (req: Request) => {
     } else if (provider === 'openai' && !OPENAI_KEY) {
       console.warn("Fallback: No hay OPENAI_KEY, saltando a Anthropic");
       provider = 'anthropic';
-      modelToUse = 'claude-3-5-sonnet-20241022';
+      modelToUse = 'claude-sonnet-4-6';
     }
 
     let fullText = '';
@@ -125,7 +125,7 @@ serve(async (req: Request) => {
       const finalModel = 
         modelToUse === 'claude-sonnet-4-6' ? 'claude-sonnet-4-6' : 
         modelToUse === 'claude-haiku-4-5-20251001' ? 'claude-haiku-4-5-20251001' :
-        modelToUse === 'claude-opus-4-6' ? 'claude-opus-4-6' : 'claude-sonnet-4-6';
+        modelToUse === 'claude-opus-4-7' ? 'claude-opus-4-7' : 'claude-sonnet-4-6';
 
       const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
         method: "POST",

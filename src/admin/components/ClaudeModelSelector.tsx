@@ -26,8 +26,8 @@ const MODELS = [
     borderColor: 'border-primary/20'
   },
   {
-    id: 'claude-opus-4-6',
-    name: 'Claude Opus 4.6',
+    id: 'claude-opus-4-7',
+    name: 'Claude Opus 4.7',
     speed: '🧠 5-10s',
     useCase: 'Análisis profundo y estrategia compleja',
     cost: '💰💰 Premium',
