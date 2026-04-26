@@ -28,33 +28,44 @@ const FAL_VIDEO_MODELS: Record<string, string> = {
 };
 const FALLBACK_VIDEO_MODEL = "fal-ai/kling-video/v2.1/standard/text-to-video";
 
-// Cada modelo de video usa parámetros distintos. Normalizamos aquí.
+// Cada modelo de video acepta un set distinto de durations (todas como string).
+// snapToAllowed elige el valor permitido más cercano al que pidió el usuario.
+function snapToAllowed(duration: number, allowed: number[]): string {
+  const closest = allowed.reduce((best, v) =>
+    Math.abs(v - duration) < Math.abs(best - duration) ? v : best,
+  allowed[0]);
+  return String(closest);
+}
+
 function buildVideoBody(falModel: string, prompt: string, duration: number, aspectRatio: string) {
   const ar = aspectRatio || "16:9";
 
   if (falModel.includes("kling-video")) {
-    return { prompt, duration: String(duration <= 5 ? 5 : 10), aspect_ratio: ar };
+    return { prompt, duration: snapToAllowed(duration, [5, 10]), aspect_ratio: ar };
   }
   if (falModel.includes("minimax")) {
     return { prompt, prompt_optimizer: true };
   }
   if (falModel.includes("seedance")) {
-    return { prompt, duration: String(duration), aspect_ratio: ar, resolution: "1080p" };
+    return { prompt, duration: snapToAllowed(duration, [5, 10]), aspect_ratio: ar, resolution: "1080p" };
   }
   if (falModel.includes("veo3")) {
-    return { prompt, aspect_ratio: ar };
+    // Veo3 acepta '8s' como default; si el modelo soporta enum '15'|'30'|...
+    // FAL los acepta como string. Snap al valor más cercano para evitar 422.
+    return { prompt, aspect_ratio: ar, duration: snapToAllowed(duration, [15, 30, 45, 60]) };
   }
   if (falModel.includes("pixverse")) {
-    return { prompt, aspect_ratio: ar, duration: String(duration <= 5 ? 5 : 8) };
+    return { prompt, aspect_ratio: ar, duration: snapToAllowed(duration, [5, 8]) };
   }
-  // Default genérico
-  return { prompt, aspect_ratio: ar, duration: String(duration) };
+  // Modelos no conocidos: NO enviar duration para que FAL use su default y
+  // evitar errores de tipo cuando el modelo espera un enum específico.
+  return { prompt, aspect_ratio: ar };
 }
 
 const Schema = z.object({
   prompt: z.string().min(10).max(2000),
   modelId: z.string().default("kling-2-5-turbo"),
-  duration: z.number().int().min(3).max(30).default(5),
+  duration: z.number().int().min(3).max(60).default(5),
   aspectRatio: z.enum(["1:1", "16:9", "9:16", "4:3", "3:4"]).default("16:9"),
 });
 
