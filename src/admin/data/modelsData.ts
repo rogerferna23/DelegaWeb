@@ -27,6 +27,7 @@ export interface CreativePreset {
   badgeColor: string | null;
   typeBadge: string;
   imageDesc: string;
+  previewUrl?: string;
   small?: boolean;
 }
 
@@ -432,6 +433,10 @@ export const PRESET_CATEGORIES: string[] = [
 
 // ─── Presets por sub-tab ───────────────────────────────────
 
+// Imágenes de Unsplash (libres de uso). Si alguna URL falla, la tarjeta cae
+// elegantemente al gradiente de fondo gracias al onError del <img>.
+const unsplash = (id: string) => `https://images.unsplash.com/photo-${id}?w=600&q=80&auto=format&fit=crop`;
+
 export const IMAGE_PRESETS: CreativePreset[] = [
   {
     id: 'preset-img-1',
@@ -441,6 +446,7 @@ export const IMAGE_PRESETS: CreativePreset[] = [
     badgeColor: '#ef4444',
     typeBadge: 'IMAGEN',
     imageDesc: 'Zapatilla deportiva roja Nike sobre fondo rojo vibrante, iluminación de estudio profesional',
+    previewUrl: unsplash('1542291026-7eec264c27ff'),
   },
   {
     id: 'preset-img-2',
@@ -450,6 +456,7 @@ export const IMAGE_PRESETS: CreativePreset[] = [
     badgeColor: '#ef4444',
     typeBadge: 'IMAGEN',
     imageDesc: 'Collage colorido de iconos de redes sociales: Instagram, Spotify, Twitter, TikTok flotando sobre fondo degradado',
+    previewUrl: unsplash('1611162617213-7d7a39e9b1d7'),
   },
   {
     id: 'preset-img-3',
@@ -459,6 +466,7 @@ export const IMAGE_PRESETS: CreativePreset[] = [
     badgeColor: '#22c55e',
     typeBadge: 'IMAGEN',
     imageDesc: 'Arco arquitectónico minimalista con cielo azul, estilo editorial de revista',
+    previewUrl: unsplash('1486718448742-163732cd1544'),
   },
   {
     id: 'preset-img-4',
@@ -468,6 +476,7 @@ export const IMAGE_PRESETS: CreativePreset[] = [
     badgeColor: '#22c55e',
     typeBadge: 'IMAGEN',
     imageDesc: 'Gafas de sol estilo moderno sobre fondo gris minimalista, fotografía de producto',
+    previewUrl: unsplash('1572635196237-14b3f281503f'),
   },
   {
     id: 'preset-img-5',
@@ -477,6 +486,7 @@ export const IMAGE_PRESETS: CreativePreset[] = [
     badgeColor: null,
     typeBadge: 'IMAGEN',
     imageDesc: 'Vista cenital flat lay de productos cosméticos sobre fondo blanco, estilo minimalista',
+    previewUrl: unsplash('1556228720-195a672e8a03'),
     small: true,
   },
   {
@@ -487,6 +497,7 @@ export const IMAGE_PRESETS: CreativePreset[] = [
     badgeColor: null,
     typeBadge: 'IMAGEN',
     imageDesc: 'Persona con conjunto rojo moderno posando en la calle, fotografía de moda urbana',
+    previewUrl: unsplash('1483985988355-763728e1935b'),
     small: true,
   },
   {
@@ -497,6 +508,7 @@ export const IMAGE_PRESETS: CreativePreset[] = [
     badgeColor: '#22c55e',
     typeBadge: 'IMAGEN',
     imageDesc: 'Mujer joven con sombrero y gafas de sol posando al aire libre, estilo festival bohemio',
+    previewUrl: unsplash('1469334031218-e382a71b716b'),
     small: true,
   },
   {
@@ -507,6 +519,7 @@ export const IMAGE_PRESETS: CreativePreset[] = [
     badgeColor: null,
     typeBadge: 'IMAGEN',
     imageDesc: 'Retrato artístico oscuro con iluminación dramática, estilo cinematográfico',
+    previewUrl: unsplash('1492288991661-058aa541ff43'),
     small: true,
   },
 ];
@@ -520,6 +533,7 @@ export const VIDEO_PRESETS: CreativePreset[] = [
     badgeColor: null,
     typeBadge: 'VIDEO',
     imageDesc: 'Claqueta de cine con escena de acción al fondo, estilo cinematográfico',
+    previewUrl: unsplash('1485846234645-a62644f84728'),
   },
   {
     id: 'preset-vid-2',
@@ -529,6 +543,7 @@ export const VIDEO_PRESETS: CreativePreset[] = [
     badgeColor: '#ef4444',
     typeBadge: 'VIDEO',
     imageDesc: 'Logo de Netflix sobre fondo rojo oscuro con efecto cinematográfico',
+    previewUrl: unsplash('1574375927938-d5a98e8ffe85'),
   },
   {
     id: 'preset-vid-3',
@@ -538,6 +553,7 @@ export const VIDEO_PRESETS: CreativePreset[] = [
     badgeColor: null,
     typeBadge: 'VIDEO',
     imageDesc: 'Coche blanco deportivo en movimiento con efecto zoom cinematográfico',
+    previewUrl: unsplash('1552519507-da3b142c6e3d'),
   },
   {
     id: 'preset-vid-4',
@@ -547,6 +563,7 @@ export const VIDEO_PRESETS: CreativePreset[] = [
     badgeColor: null,
     typeBadge: 'VIDEO',
     imageDesc: 'Logo grande de Instagram en degradado rosa y morado sobre fondo vibrante',
+    previewUrl: unsplash('1611162617213-7d7a39e9b1d7'),
   },
   {
     id: 'preset-vid-5',
@@ -556,6 +573,7 @@ export const VIDEO_PRESETS: CreativePreset[] = [
     badgeColor: null,
     typeBadge: 'VIDEO',
     imageDesc: 'Bowl de comida saludable con verduras frescas, fotografía cenital food styling',
+    previewUrl: unsplash('1546069901-ba9599a7e63c'),
   },
 ];
 
@@ -568,6 +586,7 @@ export const AVATAR_PRESETS: CreativePreset[] = [
     badgeColor: null,
     typeBadge: 'AVATAR',
     imageDesc: 'Mujer joven sonriente con sweater burgundy, fondo bokeh cálido, retrato profesional',
+    previewUrl: unsplash('1494790108377-be9c29b29330'),
   },
 ];
 
