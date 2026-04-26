@@ -54,6 +54,12 @@ async function handleMessage(client, msg) {
 
   // --- COMANDO SECRETO PARA PROBAR REPORTES ---
   if (userText.toLowerCase() === '!testreport') {
+    const senderNumber = contact.number || chatId.replace('@c.us', '');
+    const isAdmin = config.ADMIN_NUMBERS.some(n => n && senderNumber.includes(n));
+    if (!isAdmin) {
+      console.log(`[Test] !testreport rechazado — no es admin: ${senderNumber}`);
+      return;
+    }
     console.log('[Test] Triggering test report...');
     await notifyRoger(client, { 
       contactName,
@@ -130,6 +136,11 @@ async function handleMessage(client, msg) {
 
   } catch (err) {
     console.error(`[Handler] Error processing message from ${contactName}:`, err.message);
+    // Avisar al cliente para que no quede sin respuesta — antes el bot
+    // se quedaba mudo si fallaba la IA o la BD.
+    try {
+      await msg.reply('Disculpa, tuve un problema técnico. ¿Puedes repetirme tu mensaje en un minuto?');
+    } catch { /* el envío también falló — nada más que hacer */ }
   }
 }
 

@@ -29,10 +29,18 @@ serve(async (req: Request) => {
       throw new Error('No autorizado: Sin token');
     }
 
-    const { systemPrompt, userPrompt } = await req.json();
+    const body = await req.json();
+    const { systemPrompt, userPrompt } = body;
 
     if (!systemPrompt || !userPrompt) {
       throw new Error('Faltan prompts requeridos (systemPrompt, userPrompt)');
+    }
+
+    if (typeof systemPrompt !== 'string' || systemPrompt.length > 8000) {
+      throw new Error('systemPrompt inválido o demasiado largo');
+    }
+    if (typeof userPrompt !== 'string' || userPrompt.length > 4000) {
+      throw new Error('userPrompt inválido o demasiado largo');
     }
 
     const supabase = createClient(
@@ -61,6 +69,16 @@ serve(async (req: Request) => {
       .eq('user_id', user.id)
       .maybeSingle();
     
+    // Validamos al menos una clave disponible antes de cualquier fallback —
+    // así devolvemos un 500 claro en vez de fallar más tarde con un error
+    // críptico de "Authorization header missing".
+    if (!ANTHROPIC_KEY && !OPENAI_KEY) {
+      return new Response(
+        JSON.stringify({ error: "Servidor sin configurar: faltan ANTHROPIC_API_KEY y OPENAI_API_KEY" }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
+
     let modelToUse = userPref?.preferred_claude_model || 'claude-sonnet-4-6';
     let provider = modelToUse.startsWith('gpt-') ? 'openai' : 'anthropic';
 

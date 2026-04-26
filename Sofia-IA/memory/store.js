@@ -55,17 +55,17 @@ async function getChatState(chatId) {
 
 /**
  * Increment how many times a client asked for price
- * @returns {Promise<number>} new count
+ * @returns {Promise<number>} new count (atomic — el RPC devuelve el valor
+ * actualizado en la misma transacción para evitar race conditions con
+ * mensajes simultáneos del mismo chat).
  */
 async function incrementPriceAsked(chatId) {
-  // Upsert ensures the row exists, then increment atomically
-  await supabase.rpc('sofia_increment_price_asked', { p_chat_id: chatId });
-  const { data } = await supabase
-    .from('sofia_chat_states')
-    .select('price_asked_count')
-    .eq('chat_id', chatId)
-    .single();
-  return data?.price_asked_count ?? 1;
+  const { data, error } = await supabase.rpc('sofia_increment_price_asked', { p_chat_id: chatId });
+  if (error) {
+    console.error('[Store] incrementPriceAsked error:', error.message);
+    return 1;
+  }
+  return typeof data === 'number' ? data : 1;
 }
 
 /**

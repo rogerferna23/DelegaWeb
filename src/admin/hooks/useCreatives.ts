@@ -23,13 +23,20 @@ export function useCreatives() {
       setError(null);
 
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        setCreatives([]);
+        return;
+      }
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-library`,
         {
-          headers: { Authorization: `Bearer ${session?.access_token}` },
+          headers: { Authorization: `Bearer ${session.access_token}` },
         }
       );
+      if (!response.ok) {
+        throw new Error(`Error ${response.status} al cargar creativos`);
+      }
 
       const data = await response.json();
       if (!data.ok) throw new Error(data.error || 'Error al cargar creativos');

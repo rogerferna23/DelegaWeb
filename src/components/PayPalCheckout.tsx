@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import { sendSaleNotification } from '../services/emailService';
 import { validate, checkoutSchema } from '../schemas/forms.schema';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+
 interface CartItem { name: string; price: number }
 
 interface PayPalCheckoutProps {
@@ -14,54 +16,47 @@ interface PayPalCheckoutProps {
   onSuccess?: () => void;
 }
 
-interface RecordSaleParams {
-  service: string;
-  price: string;
+interface CampaignOption { value: string; label: string }
+
+interface CaptureResult {
+  ok: boolean;
+  dbSyncError?: boolean;
+  order?: { id: string; payer: Record<string, unknown> };
+  error?: string;
+}
+
+async function captureAndRecordSale(params: {
+  orderId: string;
+  expectedAmount: string;
   currency: string;
-  payerName: string;
-  payerEmail: string | undefined;
+  service: string;
   payerPhone: string;
   campaignSource: string;
   projectNotes: string;
-  orderId: string;
-}
-
-interface CampaignOption { value: string; label: string }
-
-async function recordSale({ service, price, currency, payerName, payerEmail, payerPhone, campaignSource, projectNotes, orderId }: RecordSaleParams): Promise<boolean> {
-  try {
-    const { error } = await supabase.from('ventas').insert({
-      servicio: service,
-      importe: parseFloat(price),
-      moneda: currency,
-      cliente_nombre: payerName,
-      cliente_email: payerEmail,
-      cliente_telefono: payerPhone,
-      campana_origen: campaignSource,
-      notas: projectNotes,
-      paypal_order_id: orderId,
-      estado: 'pagado',
-    });
-    if (error) {
-      console.error("Supabase insert error:", error);
-      return false;
+  priority: boolean;
+  accessToken: string;
+}): Promise<CaptureResult> {
+  const res = await fetch(
+    `${SUPABASE_URL}/functions/v1/capture-paypal-order`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${params.accessToken}`,
+      },
+      body: JSON.stringify({
+        orderId: params.orderId,
+        expectedAmount: params.expectedAmount,
+        currency: params.currency,
+        service: params.service,
+        payerPhone: params.payerPhone,
+        campaignSource: params.campaignSource,
+        projectNotes: params.projectNotes,
+        priority: params.priority,
+      }),
     }
-
-    // Trigger email notification for web sale
-    sendSaleNotification({
-      servicio: service,
-      importe: parseFloat(price),
-      moneda: currency,
-      clienteNombre: payerName,
-      clienteEmail: payerEmail ?? '',
-      fecha: new Date().toLocaleDateString(),
-    }, 'web');
-
-    return true;
-  } catch (err) {
-    console.error("Record sale error:", err);
-    return false;
-  }
+  );
+  return res.json() as Promise<CaptureResult>;
 }
 
 export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSuccess }: PayPalCheckoutProps) {
@@ -340,29 +335,46 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
                     intent: 'CAPTURE',
                   });
                 }}
-                onApprove={async (_, actions) => {
+                onApprove={async (data) => {
                   setStatus('processing');
                   try {
-                    const order = await actions.order!.capture();
-                    const payerData = order.payer as Record<string, unknown>;
-                    setPayer(payerData);
-                    setOrderDetails(order as unknown as Record<string, unknown>);
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const accessToken = session?.access_token ?? '';
 
-                    const nameData = payerData.name as Record<string, string> | undefined;
-                    const dbSuccess = await recordSale({
-                      service: combinedServiceNames,
-                      price: finalPrice,
+                    const result = await captureAndRecordSale({
+                      orderId: data.orderID,
+                      expectedAmount: finalPrice,
                       currency,
-                      payerName: `${nameData?.given_name ?? ''} ${nameData?.surname ?? ''}`.trim(),
-                      payerEmail: payerData.email_address as string | undefined,
+                      service: combinedServiceNames,
                       payerPhone,
                       campaignSource,
                       projectNotes,
-                      orderId: order.id ?? '',
+                      priority,
+                      accessToken,
                     });
 
-                    if (!dbSuccess) {
+                    if (result.error && !result.order) {
+                      setErrorMsg(result.error);
+                      setStatus('error');
+                      return;
+                    }
+
+                    const payerData = result.order?.payer ?? {};
+                    setPayer(payerData as Record<string, unknown>);
+                    setOrderDetails({ id: result.order?.id } as Record<string, unknown>);
+
+                    if (result.dbSyncError) {
                       setDbSyncError(true);
+                    } else {
+                      const nameData = (payerData as Record<string, Record<string, string>>).name;
+                      sendSaleNotification({
+                        servicio: combinedServiceNames,
+                        importe: parseFloat(finalPrice),
+                        moneda: currency,
+                        clienteNombre: `${nameData?.given_name ?? ''} ${nameData?.surname ?? ''}`.trim(),
+                        clienteEmail: (payerData as Record<string, string>).email_address ?? '',
+                        fecha: new Date().toLocaleDateString(),
+                      }, 'web');
                     }
                     setStatus('success');
                   } catch (err) {
