@@ -58,7 +58,9 @@
       "Bash(npx supabase *)",
       "Bash(git commit -m 'chore: actualizar package-lock de Sofia-IA y permisos locales *)",
       "Bash(git commit -m 'feat\\(creativos\\): añadir imágenes de preview a las tarjetas de presets *)",
-      "Bash(git commit -m 'chore: actualizar permisos locales de la sesión *)"
+      "Bash(git commit -m 'chore: actualizar permisos locales de la sesión *)",
+      "Bash(git commit -m 'fix\\(csp\\): permitir imágenes de Unsplash y FAL.ai *)",
+      "Bash(git commit -m 'chore: actualizar permisos locales *)"
     ]
   }
 }
