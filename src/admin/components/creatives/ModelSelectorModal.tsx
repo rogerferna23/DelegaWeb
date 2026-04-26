@@ -42,7 +42,11 @@ export default function ModelSelectorModal({ isOpen, onClose, onSelect, currentM
     } else if (sortBy === 'quality_desc') {
       result.sort((a, b) => b.credits - a.credits);
     } else if (sortBy === 'speed_desc') {
-      result.sort((a, b) => a.credits - b.credits);
+      result.sort((a, b) => {
+        const aFast = a.category === 'velocidad' ? 0 : 1;
+        const bFast = b.category === 'velocidad' ? 0 : 1;
+        return aFast - bFast || a.credits - b.credits;
+      });
     }
 
     return result;
