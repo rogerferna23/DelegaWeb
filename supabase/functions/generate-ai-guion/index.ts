@@ -5,22 +5,31 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 declare const Deno: any;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://delegaweb.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const ALLOWED_ORIGINS = [
+  'https://delegaweb.com',
+  'https://www.delegaweb.com',
+  'https://delega-web.vercel.app',
+  'http://localhost:5173',
+];
+function buildCors(req: Request) {
+  const origin = req.headers.get('origin') ?? '';
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowed,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Vary': 'Origin',
+  };
+}
 
 serve(async (req: Request) => {
+  const corsHeaders = buildCors(req);
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      status: 200,
-      headers: corsHeaders
-    });
+    return new Response('ok', { status: 200, headers: corsHeaders });
   }
 
-  if (req.headers.get('origin') !== 'https://delegaweb.com') {
-    return new Response('Forbidden', { status: 403 });
+  if (!ALLOWED_ORIGINS.includes(req.headers.get('origin') ?? '')) {
+    return new Response(JSON.stringify({ error: 'Forbidden origin' }), { status: 403, headers: corsHeaders });
   }
 
   try {

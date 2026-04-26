@@ -19,18 +19,25 @@ export default function SecurityBanner() {
     
     // Consultar alertas de seguridad no resueltas
     const fetchSecurityAlerts = async () => {
-      const { data, error } = await supabase
-        .from('activity_logs')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .eq('action', 'suspicious_activity')
-        .eq('is_resolved', false)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      try {
+        const { data, error } = await supabase
+          .from('activity_logs')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .eq('action', 'suspicious_activity')
+          .order('created_at', { ascending: false })
+          .limit(1);
 
-      if (data && data[0]) {
-        setAlert(data[0]);
-        setVisible(true);
+        if (error) {
+          console.warn('SecurityBanner: alerta no disponible', error.message);
+          return;
+        }
+        if (data && data[0]) {
+          setAlert(data[0]);
+          setVisible(true);
+        }
+      } catch (e) {
+        console.warn('SecurityBanner: fallo de red', e);
       }
     };
 
