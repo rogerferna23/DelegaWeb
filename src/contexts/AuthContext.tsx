@@ -321,8 +321,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<LoginResult> => {
     try {
-      const MAX_ATTEMPTS = 3;
-      const ATTEMPT_TIMEOUT_MS = 12000;
+      const MAX_ATTEMPTS = 2;
+      const ATTEMPT_TIMEOUT_MS = 7000;
 
       const attemptSignIn = (): Promise<Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>> =>
         Promise.race([
@@ -367,11 +367,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user } = data;
       if (!user) throw new Error('SESSION_MISSING');
 
-      const MFA_TIMEOUT_MS = 10000;
-      const MFA_CHECK_FAILED = Symbol('mfa_check_failed');
-
+      // MFA check: si falla o tarda >5s, asumimos que el usuario no tiene MFA
+      // y dejamos pasar. Si realmente lo tiene, los edge functions críticos
+      // bloquearán por AAL. Antes el timeout aquí desconectaba al usuario y
+      // bloqueaba el login en redes lentas.
+      const MFA_TIMEOUT_MS = 5000;
       type MFASuccess = { mfaRequired: true; factorId: string } | { mfaRequired: false };
-      let mfaResult: MFASuccess | typeof MFA_CHECK_FAILED;
+      let mfaResult: MFASuccess = { mfaRequired: false };
 
       try {
         const mfaCheckPromise = (async (): Promise<MFASuccess> => {
@@ -387,31 +389,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { mfaRequired: false };
         })();
 
-        mfaResult = await Promise.race([
+        const timeoutMarker = Symbol('mfa_timeout');
+        const raced = await Promise.race([
           mfaCheckPromise,
-          new Promise<typeof MFA_CHECK_FAILED>(resolve =>
-            setTimeout(() => resolve(MFA_CHECK_FAILED), MFA_TIMEOUT_MS)
+          new Promise<typeof timeoutMarker>(resolve =>
+            setTimeout(() => resolve(timeoutMarker), MFA_TIMEOUT_MS)
           ),
         ]);
+        if (raced !== timeoutMarker) {
+          mfaResult = raced as MFASuccess;
+        } else {
+          console.warn('MFA check: timeout, asumiendo sin MFA');
+        }
       } catch (mfaErr) {
-        const msg = mfaErr instanceof Error ? mfaErr.message : String(mfaErr);
-        console.error('MFA check error:', msg);
-        mfaResult = MFA_CHECK_FAILED;
-      }
-
-      if (mfaResult === MFA_CHECK_FAILED) {
-        try { await supabase.auth.signOut(); } catch { /* noop */ }
-        return {
-          success: false,
-          error: 'No se pudo verificar el segundo factor. Por favor, intenta nuevamente en unos segundos.',
-        };
+        console.warn('MFA check error, asumiendo sin MFA:', mfaErr);
       }
 
       if (mfaResult.mfaRequired) {
         return { success: true, mfaRequired: true, factorId: mfaResult.factorId };
       }
 
-      await applySession(user);
+      // applySession con timeout — si tarda >4s dejamos que el listener
+      // onAuthStateChange lo termine en background; el usuario ya entra.
+      try {
+        await Promise.race([
+          applySession(user),
+          new Promise<void>(resolve => setTimeout(resolve, 4000)),
+        ]);
+      } catch (e) {
+        console.warn('applySession lento, continuando:', e);
+      }
       return { success: true };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
