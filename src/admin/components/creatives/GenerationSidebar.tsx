@@ -123,10 +123,30 @@ Reglas:
       setIsGenerating(true);
       setResult(null);
       setImageLoadError(false);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
+
+      // Token: leer de localStorage primero (sync), getSession() como fallback
+      // con timeout corto para que no cuelgue el flow si la red está mal.
+      let accessToken: string | undefined;
+      try {
+        const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        if (key) {
+          const parsed = JSON.parse(localStorage.getItem(key) ?? '{}');
+          accessToken = parsed?.access_token ?? parsed?.session?.access_token;
+        }
+      } catch { /* ignore */ }
+
+      if (!accessToken) {
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SESSION_TIMEOUT')), 3000)),
+        ]);
+        accessToken = sessionResult.data.session?.access_token;
+      }
+
+      if (!accessToken) {
         throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
       }
+      console.log('[Generate] Token OK, enviando a', isVideo ? 'generate-video' : 'generate-image');
       const endpoint = isVideo ? 'generate-video' : 'generate-image';
       const body = isVideo
         ? { prompt, modelId: selectedModelId, duration, aspectRatio }
@@ -134,7 +154,7 @@ Reglas:
 
       const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
