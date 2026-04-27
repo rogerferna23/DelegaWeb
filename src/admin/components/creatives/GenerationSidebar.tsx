@@ -44,22 +44,45 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
   // Polling para video cuando el status es 'processing'
   useEffect(() => {
     if (!result || result.kind !== 'video' || result.status !== 'processing') return;
+    const videoId = result.videoId;
+    if (!videoId) {
+      console.error('[Polling] videoId vacío, abortando polling');
+      toast.error('Error: el video no devolvió un ID válido');
+      setResult(null);
+      return;
+    }
+
+    // Token sync de localStorage (evita que getSession() colgue el polling)
+    const getToken = (): string | undefined => {
+      try {
+        const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        if (!key) return undefined;
+        const parsed = JSON.parse(localStorage.getItem(key) ?? '{}');
+        return parsed?.access_token ?? parsed?.session?.access_token;
+      } catch { return undefined; }
+    };
+
     const intervalId = setInterval(async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const token = getToken();
+        if (!token) return;
         const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-video-status`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-          body: JSON.stringify({ videoId: result.videoId }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ videoId }),
         });
         const data = await r.json();
+        if (!r.ok) {
+          console.error('[Polling] check-video-status error:', { status: r.status, body: data, videoId });
+          return;
+        }
         if (data.status === 'completed' && data.videoUrl) {
-          setResult({ kind: 'video', videoId: result.videoId, url: data.videoUrl, status: 'completed' });
+          setResult({ kind: 'video', videoId, url: data.videoUrl, status: 'completed' });
         } else if (data.status === 'failed') {
-          setResult({ kind: 'video', videoId: result.videoId, status: 'failed' });
+          setResult({ kind: 'video', videoId, status: 'failed' });
           toast.error('La generación de video falló.');
         }
-      } catch (err) { console.error(err); }
+      } catch (err) { console.error('[Polling] error:', err); }
     }, 8000);
     return () => clearInterval(intervalId);
   }, [result, toast]);
