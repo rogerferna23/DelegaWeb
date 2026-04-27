@@ -66,7 +66,7 @@ const Schema = z.object({
   prompt: z.string().min(10).max(2000),
   modelId: z.string().default("kling-2-5-turbo"),
   duration: z.number().int().min(3).max(60).default(5),
-  aspectRatio: z.enum(["1:1", "16:9", "9:16", "4:3", "3:4"]).default("16:9"),
+  aspectRatio: z.enum(["1:1", "16:9", "9:16", "4:3", "3:4", "4:5"]).default("16:9"),
 });
 
 const ALLOWED_ORIGINS = [
