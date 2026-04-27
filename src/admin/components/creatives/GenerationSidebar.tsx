@@ -62,6 +62,9 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
       } catch { return undefined; }
     };
 
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 5;
+
     const intervalId = setInterval(async () => {
       try {
         const token = getToken();
@@ -73,16 +76,26 @@ export default function GenerationSidebar({ isOpen, onClose, preset, mediaType, 
         });
         const data = await r.json();
         if (!r.ok) {
-          console.error('[Polling] check-video-status error:', { status: r.status, body: data, videoId });
+          consecutiveErrors++;
+          console.error(`[Polling] check-video-status error (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, { status: r.status, body: data, videoId });
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            console.error('[Polling] máximo de errores alcanzado, abortando');
+            setResult({ kind: 'video', videoId, status: 'failed' });
+            toast.error('Polling falló repetidamente. Genera el video de nuevo.');
+          }
           return;
         }
+        consecutiveErrors = 0;
         if (data.status === 'completed' && data.videoUrl) {
           setResult({ kind: 'video', videoId, url: data.videoUrl, status: 'completed' });
         } else if (data.status === 'failed') {
           setResult({ kind: 'video', videoId, status: 'failed' });
           toast.error('La generación de video falló.');
         }
-      } catch (err) { console.error('[Polling] error:', err); }
+      } catch (err) {
+        consecutiveErrors++;
+        console.error('[Polling] error:', err);
+      }
     }, 8000);
     return () => clearInterval(intervalId);
   }, [result, toast]);

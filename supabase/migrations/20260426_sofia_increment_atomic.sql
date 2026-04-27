@@ -2,6 +2,8 @@
 -- transacción, eliminando una race condition entre el INSERT/UPDATE y el SELECT
 -- separado que el cliente hacía después.
 
+drop function if exists sofia_increment_price_asked(text);
+
 create or replace function sofia_increment_price_asked(p_chat_id text)
 returns integer language plpgsql as $$
 declare
