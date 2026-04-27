@@ -41,9 +41,19 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    const { videoId } = await req.json();
-    if (!videoId) {
-      return new Response(JSON.stringify({ error: "videoId requerido" }), { status: 400, headers: corsHeaders });
+    let body: Record<string, unknown> = {};
+    try {
+      body = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: "Body JSON inválido" }), { status: 400, headers: corsHeaders });
+    }
+    const videoId = body.videoId;
+    if (!videoId || typeof videoId !== "string") {
+      console.warn("check-video-status: body recibido sin videoId válido:", body);
+      return new Response(
+        JSON.stringify({ error: "videoId requerido", receivedKeys: Object.keys(body) }),
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     // Recuperar el video y verificar dueño
