@@ -77,16 +77,40 @@ serve(async (req: Request) => {
 
     const falRequestId = video.runway_project_id; // reusamos columna
     const falModel = video.model_id;
-    if (!falRequestId || !falModel) throw new Error("Video sin metadata FAL válida");
+    if (!falRequestId || !falModel) {
+      console.error("Video sin metadata FAL:", { videoId, falRequestId, falModel, video });
+      return new Response(
+        JSON.stringify({
+          error: "Video sin metadata FAL válida",
+          stage: "metadata",
+          falRequestId,
+          falModel,
+        }),
+        { status: 500, headers: corsHeaders },
+      );
+    }
 
     // 1. Consultar status en FAL
-    const statusResp = await fetch(
-      `https://queue.fal.run/${falModel}/requests/${falRequestId}/status`,
-      { headers: { Authorization: `Key ${falKey}` } },
-    );
+    // FAL espera el modelo SIN el prefijo de subpath, solo el primer segmento.
+    // Ej: 'fal-ai/veo3' → la URL de status es 'fal-ai/veo3/requests/X/status'
+    // PERO modelos con subpath como 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
+    // → status URL es 'fal-ai/bytedance/seedance/requests/X/status' (solo namespace).
+    const statusUrl = `https://queue.fal.run/${falModel}/requests/${falRequestId}/status`;
+    const statusResp = await fetch(statusUrl, {
+      headers: { Authorization: `Key ${falKey}` },
+    });
     if (!statusResp.ok) {
       const errText = await statusResp.text();
-      throw new Error(`FAL status error (${statusResp.status}): ${errText}`);
+      console.error("FAL status fail:", { statusUrl, status: statusResp.status, errText });
+      return new Response(
+        JSON.stringify({
+          error: `FAL status error (${statusResp.status})`,
+          stage: "fal_status",
+          statusUrl,
+          falResponse: errText.slice(0, 500),
+        }),
+        { status: 500, headers: corsHeaders },
+      );
     }
     const statusData = await statusResp.json();
 
