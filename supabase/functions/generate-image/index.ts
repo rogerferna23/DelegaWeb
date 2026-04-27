@@ -41,6 +41,8 @@ function buildSizeParams(falModel: string, aspectRatio: string) {
       "9:16": "portrait_16_9",
       "4:3":  "landscape_4_3",
       "3:4":  "portrait_4_3",
+      // 4:5 no tiene preset directo; usamos portrait_4_3 como aproximación
+      "4:5":  "portrait_4_3",
     };
     return { image_size: sizeMap[aspectRatio] ?? "square_hd" };
   }
@@ -51,7 +53,7 @@ function buildSizeParams(falModel: string, aspectRatio: string) {
 const Schema = z.object({
   prompt: z.string().min(10).max(2000),
   modelId: z.string().default("flux-schnell"),
-  aspectRatio: z.enum(["1:1", "16:9", "9:16", "4:3", "3:4"]).default("1:1"),
+  aspectRatio: z.enum(["1:1", "16:9", "9:16", "4:3", "3:4", "4:5"]).default("1:1"),
   numImages: z.number().int().min(1).max(4).default(1),
 });
 
@@ -104,19 +106,34 @@ serve(async (req: Request) => {
     if (requestError) throw requestError;
 
     // 4. Llamar a FAL.ai (sync — las imágenes tardan 5-30s)
+    // Timeout de 50s para devolver al cliente antes de que Supabase mate
+    // el container (el límite del runtime es 60s).
     const sizeParams = buildSizeParams(falModel, aspectRatio);
-    const falResponse = await fetch(`https://fal.run/${falModel}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Key ${falKey}`,
-      },
-      body: JSON.stringify({
-        prompt,
-        num_images: numImages,
-        ...sizeParams,
-      }),
-    });
+    const falController = new AbortController();
+    const falTimeoutId = setTimeout(() => falController.abort(), 50_000);
+    let falResponse: Response;
+    try {
+      falResponse = await fetch(`https://fal.run/${falModel}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Key ${falKey}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          num_images: numImages,
+          ...sizeParams,
+        }),
+        signal: falController.signal,
+      });
+    } catch (e) {
+      if ((e as Error).name === "AbortError") {
+        throw new Error("FAL.ai tardó demasiado (>50s). Intenta con un modelo más rápido (flux-schnell).");
+      }
+      throw e;
+    } finally {
+      clearTimeout(falTimeoutId);
+    }
 
     if (!falResponse.ok) {
       const errText = await falResponse.text();

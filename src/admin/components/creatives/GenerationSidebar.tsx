@@ -114,11 +114,19 @@ Reglas:
       toast.error('El prompt debe tener al menos 10 caracteres.');
       return;
     }
+    const controller = new AbortController();
+    // Imagen: 60s. Video: 20s (sólo encolamos, el polling después es rápido).
+    const fetchTimeoutMs = isVideo ? 20_000 : 60_000;
+    const timeoutId = setTimeout(() => controller.abort(), fetchTimeoutMs);
+
     try {
       setIsGenerating(true);
       setResult(null);
       setImageLoadError(false);
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('Sesión expirada. Vuelve a iniciar sesión.');
+      }
       const endpoint = isVideo ? 'generate-video' : 'generate-image';
       const body = isVideo
         ? { prompt, modelId: selectedModelId, duration, aspectRatio }
@@ -126,20 +134,39 @@ Reglas:
 
       const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
-      const data = await r.json();
-      if (!data.ok) throw new Error(data.error || 'Error desconocido');
+
+      let data: { ok?: boolean; error?: string; details?: unknown; image?: { url: string }; video?: { id: string } };
+      try {
+        data = await r.json();
+      } catch {
+        throw new Error(`El servidor devolvió una respuesta no válida (HTTP ${r.status})`);
+      }
+
+      if (!r.ok || !data.ok) {
+        const detail = data.error || `HTTP ${r.status}`;
+        console.error('Generate error:', { status: r.status, body: data });
+        throw new Error(detail);
+      }
 
       if (isVideo) {
+        if (!data.video?.id) throw new Error('Respuesta sin video.id');
         setResult({ kind: 'video', videoId: data.video.id, status: 'processing' });
       } else {
+        if (!data.image?.url) throw new Error('Respuesta sin image.url');
         setResult({ kind: 'image', url: data.image.url });
       }
     } catch (err) {
-      toast.error('Error al generar: ' + (err as Error).message);
+      const e = err as Error;
+      const msg = e.name === 'AbortError'
+        ? `La generación tardó más de ${fetchTimeoutMs / 1000}s. Intenta con un modelo más rápido.`
+        : e.message;
+      toast.error('Error al generar: ' + msg);
     } finally {
+      clearTimeout(timeoutId);
       setIsGenerating(false);
     }
   };
