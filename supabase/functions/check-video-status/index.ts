@@ -59,7 +59,7 @@ serve(async (req: Request) => {
     // Recuperar el video y verificar dueño
     const { data: video, error: videoError } = await supabase
       .from("generated_videos")
-      .select("id, runway_project_id, model_id, status, video_url")
+      .select("id, runway_project_id, model_id, status, video_url, fal_status_url")
       .eq("id", videoId)
       .eq("user_id", user.id)
       .single();
@@ -75,7 +75,7 @@ serve(async (req: Request) => {
       );
     }
 
-    const falRequestId = video.runway_project_id; // reusamos columna
+    const falRequestId = video.runway_project_id;
     const falModel = video.model_id;
     if (!falRequestId || !falModel) {
       console.error("Video sin metadata FAL:", { videoId, falRequestId, falModel, video });
@@ -90,12 +90,22 @@ serve(async (req: Request) => {
       );
     }
 
-    // 1. Consultar status en FAL
-    // FAL espera el modelo SIN el prefijo de subpath, solo el primer segmento.
-    // Ej: 'fal-ai/veo3' → la URL de status es 'fal-ai/veo3/requests/X/status'
-    // PERO modelos con subpath como 'fal-ai/bytedance/seedance/v1/lite/text-to-video'
-    // → status URL es 'fal-ai/bytedance/seedance/requests/X/status' (solo namespace).
-    const statusUrl = `https://queue.fal.run/${falModel}/requests/${falRequestId}/status`;
+    // 1. Consultar status en FAL.
+    // Preferimos la URL exacta que FAL nos devolvió al encolar (fal_status_url).
+    // Si el video es viejo y no la tiene, intentamos heurística que acorta el
+    // path al namespace (fal-ai/<vendor>/<app>) — funciona para la mayoría
+    // de modelos pero no es 100% fiable, por eso la URL guardada es preferible.
+    let statusUrl: string;
+    if (video.fal_status_url) {
+      statusUrl = video.fal_status_url;
+    } else {
+      // Heurística: tomar los primeros 3 segmentos del path para apps con
+      // subpath, o el path completo si solo tiene 2.
+      const parts = falModel.split("/");
+      const namespace = parts.length >= 3 ? parts.slice(0, 3).join("/") : falModel;
+      statusUrl = `https://queue.fal.run/${namespace}/requests/${falRequestId}/status`;
+    }
+
     const statusResp = await fetch(statusUrl, {
       headers: { Authorization: `Key ${falKey}` },
     });
@@ -119,11 +129,11 @@ serve(async (req: Request) => {
     let videoUrl: string | null = null;
 
     if (statusData.status === "COMPLETED") {
-      // 2. Obtener resultado final
-      const resultResp = await fetch(
-        `https://queue.fal.run/${falModel}/requests/${falRequestId}`,
-        { headers: { Authorization: `Key ${falKey}` } },
-      );
+      // 2. Obtener resultado final — la URL del response es la del status sin /status
+      const resultUrl = statusData.response_url ?? statusUrl.replace(/\/status$/, "");
+      const resultResp = await fetch(resultUrl, {
+        headers: { Authorization: `Key ${falKey}` },
+      });
       if (!resultResp.ok) {
         const errText = await resultResp.text();
         throw new Error(`FAL result error (${resultResp.status}): ${errText}`);

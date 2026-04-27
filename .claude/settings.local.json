@@ -61,7 +61,11 @@
       "Bash(git commit -m 'chore: actualizar permisos locales de la sesión *)",
       "Bash(git commit -m 'fix\\(csp\\): permitir imágenes de Unsplash y FAL.ai *)",
       "Bash(git commit -m 'chore: actualizar permisos locales *)",
-      "Bash(git commit -m 'fix\\(auth\\): solucionar flash de login post-autenticación y al entrar *)"
+      "Bash(git commit -m 'fix\\(auth\\): solucionar flash de login post-autenticación y al entrar *)",
+      "Bash(gh pr create --title 'fix\\(security\\): corregir vulnerabilidades críticas del audit de seguridad' --body ' *)",
+      "Bash(wait)",
+      "Read(//c/Users/Usuario/AppData/Local/Temp/claude/C--Users-Usuario-Documents-Delega-delegaweb--claude-worktrees-focused-fermi-92d344/4ab7bf98-91d7-4304-a3fc-ae6d36dabd80/tasks/**)",
+      "Bash(curl -sI \"https://mtjvvaghcgfexhlfgntp.supabase.co/auth/v1/health\" -H \"Origin: https://delega-web.vercel.app\" -H \"apikey: anykey\" -m 5)"
     ]
   }
 }

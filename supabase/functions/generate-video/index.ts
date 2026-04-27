@@ -125,6 +125,11 @@ serve(async (req: Request) => {
     const requestId = falData.request_id;
     if (!requestId) throw new Error("FAL no devolvió request_id");
 
+    // FAL devuelve status_url y response_url que apuntan a la URL CORRECTA
+    // (ojo: para modelos con subpath FAL acorta el path, así que no podemos
+    // reconstruirlo nosotros — hay que usar lo que FAL nos da).
+    const falStatusUrl: string | null = falData.status_url ?? null;
+
     // 3. Guardar metadata en BD (reusamos runway_project_id para el FAL request_id)
     const { data: video, error: videoError } = await supabase
       .from("generated_videos")
@@ -133,6 +138,7 @@ serve(async (req: Request) => {
         request_id: request.id,
         runway_project_id: requestId,
         model_id: falModel,
+        fal_status_url: falStatusUrl,
         prompt,
         duration_seconds: duration,
         status: "processing",
