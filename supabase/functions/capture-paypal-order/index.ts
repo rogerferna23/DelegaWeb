@@ -139,6 +139,11 @@ serve(async (req: Request) => {
     const nameData = payerData.name ?? {};
     const payerName = `${nameData.given_name ?? ""} ${nameData.surname ?? ""}`.trim();
 
+    // La tabla 'ventas' no tiene columna user_id (las ventas son agnósticas
+    // al usuario logueado — vienen de compradores anónimos en la web pública).
+    // El userId opcional se ignora para el insert; lo dejamos resuelto arriba
+    // por si se quiere logear/auditar más adelante.
+    void userId;
     const { error: dbError } = await supabase.from("ventas").insert({
       servicio: service,
       importe: capturedAmount,
@@ -150,7 +155,6 @@ serve(async (req: Request) => {
       notas: projectNotes,
       paypal_order_id: order.id,
       estado: "pagado",
-      user_id: userId,
     });
 
     if (dbError) {
