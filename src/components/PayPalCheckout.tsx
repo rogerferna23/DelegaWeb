@@ -339,13 +339,15 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
                   setStatus('processing');
                   try {
                     // Token sync de localStorage si el comprador está logueado.
-                    // Si no, vacío — capture-paypal-order acepta auth opcional.
-                    let accessToken = '';
+                    // Fallback al anon key porque la gateway de Supabase exige
+                    // un Bearer aunque la función esté marcada no-verify-jwt.
+                    let accessToken = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
                     try {
                       const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
                       if (key) {
                         const parsed = JSON.parse(localStorage.getItem(key) ?? '{}');
-                        accessToken = parsed?.access_token ?? parsed?.session?.access_token ?? '';
+                        const userToken = parsed?.access_token ?? parsed?.session?.access_token;
+                        if (userToken) accessToken = userToken;
                       }
                     } catch { /* ignore */ }
 
