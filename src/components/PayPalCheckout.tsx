@@ -338,8 +338,16 @@ export default function PayPalCheckout({ cartItems, cartTotal, onClose, onSucces
                 onApprove={async (data) => {
                   setStatus('processing');
                   try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    const accessToken = session?.access_token ?? '';
+                    // Token sync de localStorage si el comprador está logueado.
+                    // Si no, vacío — capture-paypal-order acepta auth opcional.
+                    let accessToken = '';
+                    try {
+                      const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+                      if (key) {
+                        const parsed = JSON.parse(localStorage.getItem(key) ?? '{}');
+                        accessToken = parsed?.access_token ?? parsed?.session?.access_token ?? '';
+                      }
+                    } catch { /* ignore */ }
 
                     const result = await captureAndRecordSale({
                       orderId: data.orderID,
