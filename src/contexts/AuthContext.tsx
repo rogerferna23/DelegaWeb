@@ -428,10 +428,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Audit log: fire-and-forget para que un fallo en la tabla audit_log
+    // no bloquee el cierre de sesión.
     if (currentUser) {
-      await logAction(currentUser, 'logout', 'Cierre de sesión');
+      logAction(currentUser, 'logout', 'Cierre de sesión').catch(() => { /* noop */ });
     }
-    await supabase.auth.signOut();
+
+    // signOut con timeout de 3s — si Supabase no responde, limpiamos local
+    // manualmente para que el usuario salga igual.
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('SIGNOUT_TIMEOUT')), 3000)),
+      ]);
+    } catch (err) {
+      console.warn('logout: signOut falló o se colgó, limpiando local:', err);
+    }
+
+    // Garantía final: limpiar estado local y tokens aunque signOut haya fallado.
+    setCurrentUser(null);
+    setUsers([]);
+    setPendingRequests([]);
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('sb-'))
+        .forEach(k => localStorage.removeItem(k));
+    } catch { /* ignore */ }
   };
 
   // ── MFA helpers ───────────────────────────────────────────────────────────
