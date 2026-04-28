@@ -65,14 +65,16 @@ serve(async (req: Request) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
   try {
-    // Auth — requires logged-in user
+    // Auth opcional: este endpoint lo invocan compradores anónimos desde la
+    // web pública (Services, Navbar). La seguridad C1 contra manipulación de
+    // precio NO depende de la auth — depende de re-capturar la orden contra
+    // PayPal y verificar el monto. Si el usuario está logueado guardamos su
+    // user_id; si no, la venta queda con user_id null (igual que antes del fix).
     const token = req.headers.get("Authorization")?.replace("Bearer ", "");
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
-    }
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    let userId: string | null = null;
+    if (token) {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      userId = user?.id ?? null;
     }
 
     const body = await req.json();
@@ -148,7 +150,7 @@ serve(async (req: Request) => {
       notas: projectNotes,
       paypal_order_id: order.id,
       estado: "pagado",
-      user_id: user.id,
+      user_id: userId,
     });
 
     if (dbError) {
