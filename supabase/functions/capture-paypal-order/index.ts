@@ -134,35 +134,40 @@ serve(async (req: Request) => {
       });
     }
 
-    // 3. Insert sale record (server-side, trusted amount from PayPal)
+    // 3. Insert sale record (server-side, trusted amount from PayPal).
+    // Schema real de 'ventas': id, created_at, servicio, cliente_nombre (NOT NULL),
+    // cliente_email, importe, moneda, prioridad, origen, estado, paypal_order_id.
+    // user_id, cliente_telefono y notas no existen en la tabla — se ignoran.
     const payerData = order.payer ?? {};
     const nameData = payerData.name ?? {};
-    const payerName = `${nameData.given_name ?? ""} ${nameData.surname ?? ""}`.trim();
-
-    // La tabla 'ventas' no tiene columna user_id (las ventas son agnósticas
-    // al usuario logueado — vienen de compradores anónimos en la web pública).
-    // El userId opcional se ignora para el insert; lo dejamos resuelto arriba
-    // por si se quiere logear/auditar más adelante.
+    const payerName = `${nameData.given_name ?? ""} ${nameData.surname ?? ""}`.trim() || "Cliente PayPal";
     void userId;
+    void payerPhone;
+    void projectNotes;
+
     const { error: dbError } = await supabase.from("ventas").insert({
       servicio: service,
-      importe: capturedAmount,
-      moneda: currency,
       cliente_nombre: payerName,
       cliente_email: payerData.email_address ?? null,
-      cliente_telefono: payerPhone,
-      campana_origen: campaignSource,
-      notas: projectNotes,
-      paypal_order_id: order.id,
+      importe: capturedAmount,
+      moneda: currency,
+      prioridad: parsed.data.priority,
+      origen: campaignSource || "web",
       estado: "pagado",
+      paypal_order_id: order.id,
     });
 
     if (dbError) {
       console.error("DB insert error:", dbError);
-      // Payment was captured — return partial success so frontend can show the order ID
       return new Response(JSON.stringify({
         ok: false,
         dbSyncError: true,
+        dbErrorDetail: {
+          message: dbError.message,
+          code: dbError.code,
+          details: dbError.details,
+          hint: dbError.hint,
+        },
         order: { id: order.id, payer: payerData },
       }), { status: 200, headers: corsHeaders });
     }
